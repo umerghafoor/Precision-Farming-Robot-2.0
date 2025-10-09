@@ -1,0 +1,70 @@
+# Arduino and embedded systems
+*.hex
+*.eep
+*.elf
+*.map
+*.sym
+*.lss
+
+# Build artifacts
+build/
+.build/
+*.o
+*.a
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Data files (except examples)
+*.csv
+*.log
+data/*.csv
+!data/sample_data.csv
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Compiled libraries
+*.dll
+*.so
+*.dylib
+
+# Node modules (if using web interface)
+node_modules/
+package-lock.json
+
+# OS generated files
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Custom
+secrets.h
+config.local.h

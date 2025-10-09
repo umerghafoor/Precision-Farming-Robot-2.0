@@ -1,0 +1,18 @@
+# Python Requirements for Data Analysis
+# Install with: pip install -r requirements.txt
+
+# Data analysis
+pandas>=1.3.0
+numpy>=1.21.0
+matplotlib>=3.4.0
+
+# Optional: For advanced analysis
+scipy>=1.7.0
+scikit-learn>=0.24.0
+
+# Optional: For data visualization
+seaborn>=0.11.0
+plotly>=5.0.0
+
+# Optional: For serial communication with robot
+pyserial>=3.5
