@@ -4,21 +4,21 @@
 
 ### High-Level Overview
 
-```
+```txt
 ┌───────────────────────────────────────────────────────────────┐
-│                    Qt Application Layer                        │
-│                                                                 │
+│                    Qt Application Layer                       │
+│                                                               │
 │  ┌─────────────────────────────────────────────────────────┐  │
-│  │              Application (Facade)                        │  │
-│  │  - Initialization & Orchestration                        │  │
-│  │  - Component Lifecycle Management                        │  │
+│  │              Application (Facade)                       │  │
+│  │  - Initialization & Orchestration                       │  │
+│  │  - Component Lifecycle Management                       │  │
 │  └──────────┬──────────────┬──────────────┬────────────────┘  │
-│             │              │              │                    │
-│    ┌────────▼────────┐ ┌──▼──────────┐ ┌─▼────────────────┐  │
-│    │  ROS2Interface  │ │DigitalTwin  │ │   MainWindow     │  │
-│    │   (Thread)      │ │   Module    │ │  WidgetManager   │  │
-│    └─────────────────┘ └─────────────┘ └──────────────────┘  │
-│                                                                 │
+│             │              │              │                   │
+│    ┌────────▼────────┐ ┌──▼──────────┐ ┌─▼────────────────┐   │
+│    │  ROS2Interface  │ │DigitalTwin  │ │   MainWindow     │   │
+│    │   (Thread)      │ │   Module    │ │  WidgetManager   │   │
+│    └─────────────────┘ └─────────────┘ └──────────────────┘   │
+│                                                               │
 └───────────────────────────────────────────────────────────────┘
          │                      │                    │
          │                      │                    │
@@ -33,6 +33,7 @@
 ### 1. Core Module (`src/core/`)
 
 #### Application Class
+
 - **Role:** Facade and main orchestrator
 - **Responsibilities:**
   - Initialize all subsystems
@@ -45,6 +46,7 @@
   - Signal handlers for system events
 
 #### WidgetManager Class
+
 - **Role:** Widget factory and registry
 - **Responsibilities:**
   - Create widget instances
@@ -59,6 +61,7 @@
 ### 2. ROS2 Module (`src/ros2/`)
 
 #### ROS2Interface Class
+
 - **Role:** ROS2 communication layer
 - **Responsibilities:**
   - Manage ROS2 node lifecycle
@@ -68,6 +71,7 @@
 - **Design Pattern:** Bridge Pattern (Qt ↔ ROS2)
 
 **Thread Safety:**
+
 ```cpp
 // ROS2 spins in separate thread
 void ROS2Interface::spinROS2() {
@@ -79,7 +83,8 @@ emit imageReceived(data, w, h);  // Thread-safe
 ```
 
 **Topic Architecture:**
-```
+
+```txt
 Publishers:
   /cmd_vel          → Velocity commands
   /robot_command    → Custom commands
@@ -93,6 +98,7 @@ Subscribers:
 ### 3. Digital Twin Module (`src/twin/`)
 
 #### DigitalTwin Class
+
 - **Role:** Main twin controller
 - **Responsibilities:**
   - Manage twin operating modes
@@ -101,6 +107,7 @@ Subscribers:
 - **Design Pattern:** Strategy Pattern (modes)
 
 **Operating Modes:**
+
 ```cpp
 enum class Mode {
     Synchronized,  // Mirror real robot via ROS2
@@ -110,6 +117,7 @@ enum class Mode {
 ```
 
 #### TwinState Class
+
 - **Role:** State container
 - **Responsibilities:**
   - Store robot state (pose, velocity, sensors)
@@ -118,6 +126,7 @@ enum class Mode {
 - **Design Pattern:** Observer Pattern
 
 **State Structure:**
+
 ```cpp
 struct {
     Pose {
@@ -139,6 +148,7 @@ struct {
 ```
 
 #### TwinSimulator Class
+
 - **Role:** Physics simulation engine
 - **Responsibilities:**
   - Update physics state
@@ -147,7 +157,8 @@ struct {
 - **Design Pattern:** Command Pattern
 
 **Simulation Loop:**
-```
+
+```txt
 ┌─────────────────────┐
 │ Timer (50Hz default)│
 └──────────┬──────────┘
@@ -172,6 +183,7 @@ struct {
 ### 4. UI Module (`src/ui/`)
 
 #### MainWindow Class
+
 - **Role:** Main application window
 - **Responsibilities:**
   - Manage window layout
@@ -180,24 +192,26 @@ struct {
 - **Design Pattern:** Mediator Pattern
 
 **Layout System:**
-```
+
+```txt
 ┌─────────────────────────────────────────┐
-│           Menu Bar                       │
+│           Menu Bar                      │
 ├─────────────────────────────────────────┤
-│           Tool Bar                       │
+│           Tool Bar                      │
 ├─────────────────────────────────────────┤
-│                                          │
-│  ┌──────────┐  ┌──────────┐            │
-│  │ Dock     │  │ Dock     │  Central   │
-│  │ Widget 1 │  │ Widget 2 │  Widget    │
-│  └──────────┘  └──────────┘            │
-│                                          │
+│                                         │
+│  ┌──────────┐  ┌──────────┐             │
+│  │ Dock     │  │ Dock     │  Central    │
+│  │ Widget 1 │  │ Widget 2 │  Widget     │
+│  └──────────┘  └──────────┘             │
+│                                         │
 ├─────────────────────────────────────────┤
-│           Status Bar                     │
+│           Status Bar                    │
 └─────────────────────────────────────────┘
 ```
 
 #### BaseWidget Class (Abstract)
+
 - **Role:** Widget interface
 - **Responsibilities:**
   - Define widget contract
@@ -206,7 +220,8 @@ struct {
 - **Design Pattern:** Template Method Pattern
 
 **Widget Lifecycle:**
-```
+
+```txt
 Create → setROS2Interface() → setDigitalTwin() 
        → initialize() → [Active] → closeEvent() → Destroy
 ```
@@ -236,6 +251,7 @@ Create → setROS2Interface() → setDigitalTwin()
 ### 5. Utils Module (`src/utils/`)
 
 #### Logger Class
+
 - **Role:** Centralized logging
 - **Responsibilities:**
   - File and console logging
@@ -244,14 +260,16 @@ Create → setROS2Interface() → setDigitalTwin()
 - **Design Pattern:** Singleton Pattern
 
 **Log Levels:**
-```
+
+```txt
 Debug → Info → Warning → Error → Critical
 ```
 
 ## Data Flow
 
 ### ROS2 → UI Flow
-```
+
+```txt
 ROS2 Topic → ROS2Interface::callback()
            → emit signal (crosses thread)
            → Widget::slot()
@@ -259,7 +277,8 @@ ROS2 Topic → ROS2Interface::callback()
 ```
 
 ### UI → ROS2 Flow
-```
+
+```txt
 User Action → Widget::slot()
             → ROS2Interface::publish()
             → ROS2 Publisher (separate thread)
@@ -267,7 +286,8 @@ User Action → Widget::slot()
 ```
 
 ### Digital Twin Sync Flow
-```
+
+```txt
 ROS2 Data → ROS2Interface → emit signal
           → DigitalTwin::onROS2Data()
           → TwinState::update()
@@ -277,7 +297,7 @@ ROS2 Data → ROS2Interface → emit signal
 
 ## Threading Model
 
-```
+```txt
 ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
 │  Main/Qt     │   │  ROS2 Spin   │   │  Simulation  │
 │  Thread      │   │  Thread      │   │  (Qt Thread) │
@@ -292,6 +312,7 @@ ROS2 Data → ROS2Interface → emit signal
 ```
 
 **Thread Safety Measures:**
+
 - Qt signals/slots (queued connections)
 - QMutex in Logger
 - ROS2 runs in isolated thread
@@ -300,18 +321,21 @@ ROS2 Data → ROS2Interface → emit signal
 ## Extensibility Points
 
 ### Adding New Widgets
+
 1. Inherit from `BaseWidget`
 2. Implement `initialize()` and `displayName()`
 3. Register in `WidgetManager`
 4. Add to factory method
 
 ### Adding ROS2 Topics
+
 1. Add publisher/subscriber in `ROS2Interface`
 2. Create callback method
 3. Emit Qt signal with data
 4. Connect in interested widgets
 
 ### Adding Twin Features
+
 1. Extend `TwinState` with new data
 2. Update `TwinSimulator` if needed
 3. Modify `DigitalTwin` mode logic
@@ -354,6 +378,7 @@ try {
 ---
 
 This architecture provides:
+
 - ✅ Modularity
 - ✅ Scalability
 - ✅ Testability

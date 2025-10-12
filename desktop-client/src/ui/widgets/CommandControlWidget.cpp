@@ -74,7 +74,7 @@ void CommandControlWidget::setupUI()
 
     mainLayout->addWidget(velocityGroup);
     mainLayout->addWidget(controlGroup);
-    mainLayout->addStretch();
+    mainLayout->addStretch(1); // Give stretch to push controls to top
 }
 
 bool CommandControlWidget::initialize()

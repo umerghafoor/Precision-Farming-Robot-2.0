@@ -8,6 +8,8 @@ BaseWidget::BaseWidget(QWidget *parent)
     , m_digitalTwin(nullptr)
 {
     setMinimumSize(300, 200);
+    // Set size policy to expand in both directions
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 BaseWidget::~BaseWidget()

@@ -52,12 +52,13 @@ void TwinVisualizationWidget::setupUI()
     m_stateDisplay->setReadOnly(true);
     m_stateDisplay->setMinimumHeight(300);
     m_stateDisplay->setStyleSheet("QTextEdit { font-family: monospace; }");
+    m_stateDisplay->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     stateLayout->addWidget(m_stateDisplay);
     stateGroup->setLayout(stateLayout);
 
     mainLayout->addWidget(controlGroup);
-    mainLayout->addWidget(stateGroup);
+    mainLayout->addWidget(stateGroup, 1); // Add stretch factor
 }
 
 bool TwinVisualizationWidget::initialize()

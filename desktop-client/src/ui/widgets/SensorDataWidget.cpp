@@ -25,6 +25,7 @@ void SensorDataWidget::setupUI()
     m_sensorTable->setHorizontalHeaderLabels({"Sensor", "Value"});
     m_sensorTable->horizontalHeader()->setStretchLastSection(true);
     m_sensorTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_sensorTable->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     // Initialize sensor rows
     QStringList sensors = {

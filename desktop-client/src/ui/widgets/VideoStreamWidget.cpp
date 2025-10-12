@@ -46,9 +46,10 @@ void VideoStreamWidget::setupUI()
     m_videoLabel->setMinimumSize(640, 480);
     m_videoLabel->setStyleSheet("QLabel { background-color: black; color: white; }");
     m_videoLabel->setScaledContents(true);
+    m_videoLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     mainLayout->addLayout(controlLayout);
-    mainLayout->addWidget(m_videoLabel);
+    mainLayout->addWidget(m_videoLabel, 1); // Add stretch factor
 }
 
 bool VideoStreamWidget::initialize()
