@@ -1,6 +1,7 @@
 #include "Logger.h"
 #include <QDateTime>
 #include <QDebug>
+#include <QRecursiveMutex>
 
 Logger::Logger()
     : m_logLevel(Level::Debug)

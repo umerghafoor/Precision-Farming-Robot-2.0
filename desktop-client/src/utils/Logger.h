@@ -5,7 +5,7 @@
 #include <QString>
 #include <QFile>
 #include <QTextStream>
-#include <QMutex>
+#include <QRecursiveMutex>
 
 /**
  * @brief Singleton logger class for application-wide logging
@@ -48,7 +48,7 @@ private:
 
     QFile m_logFile;
     QTextStream m_logStream;
-    QMutex m_mutex;
+    QRecursiveMutex m_mutex;
     Level m_logLevel;
     bool m_initialized;
 };
