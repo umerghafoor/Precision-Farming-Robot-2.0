@@ -20,7 +20,8 @@ MainWindow::MainWindow(QWidget *parent)
     , m_digitalTwin(nullptr)
     , m_ros2Connected(false)
 {
-    setupUI();
+    setupUI();Downloading .NET version(s) 9.0.10~x64 ...
+
 }
 
 MainWindow::~MainWindow()
@@ -126,6 +127,25 @@ void MainWindow::setROS2Interface(ROS2Interface* ros2)
 void MainWindow::setDigitalTwin(DigitalTwin* twin)
 {
     m_digitalTwin = twin;
+    
+    // Create default layout after all dependencies are set
+    if (m_widgetManager && m_ros2Interface && m_digitalTwin) {
+        createDefaultLayout();
+    }
+}
+
+void MainWindow::createDefaultLayout()
+{
+    Logger::instance().info("Creating default widget layout");
+    
+    // Create a sensible default layout
+    onAddVideoStream();      // Left side
+    onAddTwinVisualization(); // Left side (will be tabbed with video)
+    onAddMotionControl();     // Right side
+    onAddCommandControl();    // Right side (will be tabbed with motion)
+    onAddSensorData();        // Bottom
+    
+    Logger::instance().info("Default layout created");
 }
 
 void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
@@ -141,8 +161,43 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
                       QDockWidget::DockWidgetClosable | 
                       QDockWidget::DockWidgetFloatable);
 
-    // Add to appropriate area
-    addDockWidget(Qt::RightDockWidgetArea, dock);
+    // Determine dock area based on widget type
+    Qt::DockWidgetArea area = Qt::RightDockWidgetArea;
+    QDockWidget* splitWith = nullptr;
+    
+    // Smart placement based on widget type
+    if (title.contains("Video", Qt::CaseInsensitive)) {
+        area = Qt::LeftDockWidgetArea;
+    } else if (title.contains("Twin", Qt::CaseInsensitive)) {
+        area = Qt::LeftDockWidgetArea;
+        // Find video widget to split with
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.key().contains("video", Qt::CaseInsensitive)) {
+                splitWith = it.value();
+                break;
+            }
+        }
+    } else if (title.contains("Motion", Qt::CaseInsensitive)) {
+        area = Qt::RightDockWidgetArea;
+    } else if (title.contains("Command", Qt::CaseInsensitive)) {
+        area = Qt::RightDockWidgetArea;
+        // Find motion widget to split with
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.key().contains("_", Qt::CaseInsensitive) && dockWidgetArea(it.value()) == Qt::RightDockWidgetArea) {
+                splitWith = it.value();
+                break;
+            }
+        }
+    } else if (title.contains("Sensor", Qt::CaseInsensitive)) {
+        area = Qt::BottomDockWidgetArea;
+    }
+    
+    addDockWidget(area, dock);
+    
+    // Split with existing widget if found
+    if (splitWith) {
+        splitDockWidget(splitWith, dock, Qt::Vertical);
+    }
     
     m_dockWidgets[widget->widgetId()] = dock;
 
@@ -151,7 +206,7 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
     widget->setDigitalTwin(m_digitalTwin);
     widget->initialize();
 
-    Logger::instance().info(QString("Added widget to dock: %1").arg(title));
+    Logger::instance().info(QString("Added widget to dock: %1 in area %2").arg(title).arg(area));
 }
 
 void MainWindow::onAddVideoStream()

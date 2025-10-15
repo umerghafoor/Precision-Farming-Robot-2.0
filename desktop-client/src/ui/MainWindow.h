@@ -49,6 +49,7 @@ private:
     void createToolBar();
     void createStatusBar();
     void addWidgetToDock(BaseWidget* widget, const QString& title);
+    void createDefaultLayout();
 
     WidgetManager* m_widgetManager;
     ROS2Interface* m_ros2Interface;
