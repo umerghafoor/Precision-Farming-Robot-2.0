@@ -34,6 +34,7 @@ protected:
 
 private slots:
     void onAddVideoStream();
+    void onAddMotionControl();
     void onAddCommandControl();
     void onAddSensorData();
     void onAddTwinVisualization();

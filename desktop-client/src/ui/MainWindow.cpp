@@ -61,6 +61,7 @@ void MainWindow::createMenus()
     QMenu* widgetsMenu = menuBar()->addMenu(tr("&Widgets"));
     widgetsMenu->addAction(tr("Add &Video Stream"), this, &MainWindow::onAddVideoStream);
     widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
+    widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
     widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
     widgetsMenu->addSeparator();
@@ -88,6 +89,7 @@ void MainWindow::createToolBar()
 
     toolbar->addAction(tr("Video"), this, &MainWindow::onAddVideoStream);
     toolbar->addAction(tr("Control"), this, &MainWindow::onAddCommandControl);
+    toolbar->addAction(tr("Motion"), this, &MainWindow::onAddMotionControl);
     toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
     toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
     toolbar->addSeparator();
@@ -166,6 +168,14 @@ void MainWindow::onAddCommandControl()
     
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::CommandControl, this);
     addWidgetToDock(widget, "Command & Control");
+}
+
+void MainWindow::onAddMotionControl()
+{
+    if (!m_widgetManager) return;
+
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::MotionControl, this);
+    addWidgetToDock(widget, "Motion Control");
 }
 
 void MainWindow::onAddSensorData()

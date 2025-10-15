@@ -21,6 +21,7 @@ class WidgetManager : public QObject
 public:
     enum class WidgetType {
         VideoStream,
+        MotionControl,
         CommandControl,
         SensorData,
         TwinVisualization,

@@ -1,6 +1,7 @@
 #include "WidgetManager.h"
 #include "BaseWidget.h"
 #include "VideoStreamWidget.h"
+#include "MotionControlWidget.h"
 #include "CommandControlWidget.h"
 #include "SensorDataWidget.h"
 #include "TwinVisualizationWidget.h"
@@ -12,6 +13,7 @@ WidgetManager::WidgetManager(QObject *parent)
 {
     // Register default widget types
     registerWidget(WidgetType::VideoStream, "Video Stream");
+    registerWidget(WidgetType::MotionControl, "Motion Control");
     registerWidget(WidgetType::CommandControl, "Command & Control");
     registerWidget(WidgetType::SensorData, "Sensor Data");
     registerWidget(WidgetType::TwinVisualization, "Digital Twin");
@@ -41,6 +43,9 @@ BaseWidget* WidgetManager::createWidget(WidgetType type, QWidget* parent)
     switch (type) {
         case WidgetType::VideoStream:
             widget = new VideoStreamWidget(parent);
+            break;
+        case WidgetType::MotionControl:
+            widget = new MotionControlWidget(parent);
             break;
         case WidgetType::CommandControl:
             widget = new CommandControlWidget(parent);
