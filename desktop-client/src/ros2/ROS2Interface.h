@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <QThread>
+#include <QByteArray>
+#include <QVariant>
 #include <memory>
 
 #ifdef USE_ROS2
