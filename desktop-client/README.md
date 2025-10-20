@@ -6,17 +6,7 @@ A professional, modular Qt6-based desktop application for controlling and monito
 
 This application follows a **clean, modular architecture** with clear separation of concerns:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Application Layer                      │
-│  (Orchestrates all subsystems - Facade Pattern)             │
-└───────────────┬─────────────────┬──────────────┬────────────┘
-                │                 │              │
-        ┌───────▼──────┐  ┌───────▼──────┐  ┌──▼─────────┐
-        │  ROS2 Module │  │ Digital Twin │  │ UI System  │
-        │              │  │   Module     │  │            │
-        └──────────────┘  └──────────────┘  └────────────┘
-```
+![alt text](docs/image.png)
 
 ### Key Design Patterns
 
