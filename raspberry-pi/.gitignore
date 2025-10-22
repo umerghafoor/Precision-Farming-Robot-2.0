@@ -1,0 +1,26 @@
+# ROS2 build and install folders
+ros2_robot_ws/build/
+ros2_robot_ws/install/
+ros2_robot_ws/log/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# VS Code settings
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Shell script outputs
+*.swp
+*.swo
+
+# Misc
+*.bak
+*.tmp
+*.log
