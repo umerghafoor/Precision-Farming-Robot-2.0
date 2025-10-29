@@ -1,0 +1,120 @@
+# Robot Configuration File
+# This file contains all tunable parameters for the 4-wheel differential robot
+
+# Motor Control Parameters
+motor_control:
+  # Geometric parameters
+  wheel_base: 0.2              # Distance between left and right wheels (meters)
+  wheel_radius: 0.05           # Wheel radius (meters)
+  
+  # Speed limits
+  max_linear_velocity: 1.0     # Maximum forward/backward speed (m/s)
+  max_angular_velocity: 2.0    # Maximum rotation speed (rad/s)
+  max_speed: 1.0               # Maximum motor speed (normalized 0-1)
+  
+  # Motor acceleration/deceleration (optional for future use)
+  acceleration_limit: 0.5      # Max acceleration (m/s^2)
+  deceleration_limit: -1.0     # Max deceleration (m/s^2)
+
+# IMU Sensor Parameters
+imu_sensor:
+  # I2C Configuration
+  i2c_bus: 1                   # I2C bus number (1 for Raspberry Pi)
+  i2c_address: 0x68            # MPU6050 default address (0x68 or 0x69)
+  
+  # Update rate
+  update_rate: 50.0            # Sensor update frequency (Hz)
+  
+  # Calibration offsets (set after calibration)
+  accel_offset_x: 0.0
+  accel_offset_y: 0.0
+  accel_offset_z: 0.0
+  gyro_offset_x: 0.0
+  gyro_offset_y: 0.0
+  gyro_offset_z: 0.0
+  
+  # Scale factors (for sensor calibration)
+  accel_scale_x: 1.0
+  accel_scale_y: 1.0
+  accel_scale_z: 1.0
+  gyro_scale_x: 1.0
+  gyro_scale_y: 1.0
+  gyro_scale_z: 1.0
+
+# Encoder & Odometry Parameters
+encoder_odometry:
+  # Physical parameters
+  wheel_radius: 0.05           # Wheel radius (meters)
+  wheel_base: 0.2              # Distance between wheels (meters)
+  
+  # Encoder specifications
+  counts_per_rev: 20           # Encoder counts per wheel revolution
+  
+  # Update rate
+  update_rate: 20.0            # Odometry update frequency (Hz)
+  
+  # Odometry covariance (adjust based on your encoder accuracy)
+  position_covariance: 0.1     # Position uncertainty (meters)
+  angle_covariance: 0.1        # Angular uncertainty (radians)
+
+# Robot Controller Parameters
+robot_controller:
+  # Control loop rate
+  control_loop_rate: 20.0      # Main control loop frequency (Hz)
+  
+  # Safety parameters
+  emergency_stop_enabled: true # Enable emergency stop feature
+  min_battery_voltage: 7.0     # Minimum safe battery voltage (V)
+  max_battery_voltage: 12.6    # Maximum battery voltage (V)
+  
+  # Velocity limits (redundant safety checks)
+  max_linear_velocity: 1.0     # Maximum forward/backward speed (m/s)
+  max_angular_velocity: 2.0    # Maximum rotation speed (rad/s)
+  
+  # Command timeout (stop if no command received for this duration)
+  command_timeout: 1.0         # Timeout in seconds
+
+# GPIO Pin Assignments
+gpio_pins:
+  # Motor 1 (Front Left)
+  motor1_pin1: 17              # Direction pin 1
+  motor1_pin2: 27              # Direction pin 2
+  motor1_pwm: 22               # PWM speed control
+  
+  # Motor 2 (Front Right)
+  motor2_pin1: 23
+  motor2_pin2: 24
+  motor2_pwm: 25
+  
+  # Motor 3 (Rear Left)
+  motor3_pin1: 5
+  motor3_pin2: 6
+  motor3_pwm: 12
+  
+  # Motor 4 (Rear Right)
+  motor4_pin1: 13
+  motor4_pin2: 19
+  motor4_pwm: 26
+  
+  # Encoder Pins (GPIO pin numbers for encoder channels)
+  encoder1_a: 4                # Motor 1 encoder A
+  encoder1_b: 14               # Motor 1 encoder B
+  encoder2_a: 15               # Motor 2 encoder A
+  encoder2_b: 18               # Motor 2 encoder B
+  encoder3_a: 2                # Motor 3 encoder A
+  encoder3_b: 3                # Motor 3 encoder B
+  encoder4_a: 7                # Motor 4 encoder A
+  encoder4_b: 8                # Motor 4 encoder B
+
+# ROS2 Topic Names
+topics:
+  cmd_vel: "/cmd_vel"                 # Input: velocity commands
+  cmd_vel_filtered: "/cmd_vel_filtered" # Output: filtered commands
+  imu_data: "/imu/data"               # Output: IMU sensor data
+  odometry: "/odom"                   # Output: odometry data
+  robot_status: "/robot_status"       # Output: robot status
+
+# Logging Configuration
+logging:
+  log_level: "INFO"            # Log level: DEBUG, INFO, WARN, ERROR
+  # Options: DEBUG (verbose), INFO (normal), WARN (warnings only), ERROR (errors only)
