@@ -20,8 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_digitalTwin(nullptr)
     , m_ros2Connected(false)
 {
-    setupUI();Downloading .NET version(s) 9.0.10~x64 ...
-
+    setupUI();
 }
 
 MainWindow::~MainWindow()
