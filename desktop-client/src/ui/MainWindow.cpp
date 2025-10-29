@@ -77,6 +77,11 @@ void MainWindow::createToolBar()
 
 void MainWindow::createStatusBar()
 {
+    // Create status label with connection indicator
+    m_statusLabel = new QLabel("ROS2: Disconnected");
+    m_statusLabel->setStyleSheet("QLabel { padding: 3px 8px; background-color: #d32f2f; color: white; border-radius: 3px; }");
+    statusBar()->addPermanentWidget(m_statusLabel);
+    
     statusBar()->showMessage(tr("Ready"));
 }
 
@@ -93,10 +98,14 @@ void MainWindow::setROS2Interface(ROS2Interface* ros2)
         connect(m_ros2Interface, &ROS2Interface::connected, this, [this]() {
             statusBar()->showMessage(tr("ROS2 Connected"), 3000);
             m_ros2Connected = true;
+            m_statusLabel->setText("ROS2: Connected");
+            m_statusLabel->setStyleSheet("QLabel { padding: 3px 8px; background-color: #388e3c; color: white; border-radius: 3px; }");
         });
         connect(m_ros2Interface, &ROS2Interface::disconnected, this, [this]() {
             statusBar()->showMessage(tr("ROS2 Disconnected"), 3000);
             m_ros2Connected = false;
+            m_statusLabel->setText("ROS2: Disconnected");
+            m_statusLabel->setStyleSheet("QLabel { padding: 3px 8px; background-color: #d32f2f; color: white; border-radius: 3px; }");
         });
     }
 }

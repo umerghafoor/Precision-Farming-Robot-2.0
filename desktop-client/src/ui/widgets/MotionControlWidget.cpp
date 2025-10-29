@@ -5,6 +5,7 @@
 #include <QGroupBox>
 #include <QSpacerItem>
 #include <QRadioButton>
+#include <QKeyEvent>
 
 MotionControlWidget::MotionControlWidget(QWidget *parent)
     : BaseWidget(parent)
@@ -91,16 +92,22 @@ void MotionControlWidget::setupUI()
     m_spinRightButton = new QPushButton("Spin Right");
     connect(m_spinLeftButton, &QPushButton::pressed, this, [this](){
         // spin left
-        if (m_ros2Interface) m_ros2Interface->publishVelocityCommand(0.0, 0.0, m_maxAngular * m_speed);
+        double angular = m_maxAngular * m_speed;
+        if (m_ros2Interface) m_ros2Interface->publishVelocityCommand(0.0, 0.0, angular);
+        m_velocityLabel->setText(QString("Linear: 0.00 m/s | Angular: %1 rad/s").arg(angular, 0, 'f', 2));
     });
     connect(m_spinLeftButton, &QPushButton::released, this, [this](){
         if (m_ros2Interface) m_ros2Interface->publishVelocityCommand(0.0, 0.0, 0.0);
+        m_velocityLabel->setText("Linear: 0.00 m/s | Angular: 0.00 rad/s");
     });
     connect(m_spinRightButton, &QPushButton::pressed, this, [this](){
-        if (m_ros2Interface) m_ros2Interface->publishVelocityCommand(0.0, 0.0, -m_maxAngular * m_speed);
+        double angular = -m_maxAngular * m_speed;
+        if (m_ros2Interface) m_ros2Interface->publishVelocityCommand(0.0, 0.0, angular);
+        m_velocityLabel->setText(QString("Linear: 0.00 m/s | Angular: %1 rad/s").arg(angular, 0, 'f', 2));
     });
     connect(m_spinRightButton, &QPushButton::released, this, [this](){
         if (m_ros2Interface) m_ros2Interface->publishVelocityCommand(0.0, 0.0, 0.0);
+        m_velocityLabel->setText("Linear: 0.00 m/s | Angular: 0.00 rad/s");
     });
     spinLayout->addWidget(m_spinLeftButton);
     spinLayout->addWidget(m_spinRightButton);
@@ -121,7 +128,19 @@ void MotionControlWidget::setupUI()
     pinStopLayout->addWidget(m_pinRadioButton);
     pinStopLayout->addWidget(m_stopButton);
 
+    // Velocity feedback display
+    m_velocityLabel = new QLabel("Linear: 0.00 m/s | Angular: 0.00 rad/s");
+    m_velocityLabel->setStyleSheet("QLabel { padding: 5px; background-color: #424242; color: #4caf50; border-radius: 3px; font-family: monospace; }");
+    m_velocityLabel->setAlignment(Qt::AlignCenter);
+    
+    // Help label for keyboard shortcut
+    QLabel* helpLabel = new QLabel("💡 Tip: Press SPACE for emergency stop");
+    helpLabel->setStyleSheet("QLabel { padding: 3px; color: #9e9e9e; font-size: 11px; }");
+    helpLabel->setAlignment(Qt::AlignCenter);
+
     mainLayout->addLayout(pinStopLayout);
+    mainLayout->addWidget(m_velocityLabel);
+    mainLayout->addWidget(helpLabel);
 
     mainLayout->addWidget(motionGroup);
     mainLayout->addWidget(speedGroup);
@@ -133,7 +152,26 @@ void MotionControlWidget::setupUI()
 bool MotionControlWidget::initialize()
 {
     Logger::instance().info("Motion control widget initialized");
+    
+    // Enable focus to receive keyboard events
+    setFocusPolicy(Qt::StrongFocus);
+    
     return true;
+}
+
+void MotionControlWidget::keyPressEvent(QKeyEvent* event)
+{
+    // Emergency stop with spacebar
+    if (event->key() == Qt::Key_Space) {
+        m_isPinned = false;
+        m_pinRadioButton->setChecked(false);
+        sendStop();
+        Logger::instance().info("Emergency stop triggered by spacebar");
+        event->accept();
+        return;
+    }
+    
+    BaseWidget::keyPressEvent(event);
 }
 
 void MotionControlWidget::onSpeedChanged(int value)
@@ -229,6 +267,11 @@ void MotionControlWidget::sendVelocityFor(Motion motion)
         // publish linear.x and angular.z only (differential drive)
         m_ros2Interface->publishVelocityCommand(linear, 0.0, angular);
         Logger::instance().debug(QString("Motion command: linear=%1 angular=%2").arg(linear).arg(angular));
+        
+        // Update velocity feedback display
+        m_velocityLabel->setText(QString("Linear: %1 m/s | Angular: %2 rad/s")
+            .arg(linear, 0, 'f', 2)
+            .arg(angular, 0, 'f', 2));
     }
 }
 
@@ -236,5 +279,8 @@ void MotionControlWidget::sendStop()
 {
     if (m_ros2Interface) {
         m_ros2Interface->publishVelocityCommand(0.0, 0.0, 0.0);
+        
+        // Update velocity feedback display
+        m_velocityLabel->setText("Linear: 0.00 m/s | Angular: 0.00 rad/s");
     }
 }

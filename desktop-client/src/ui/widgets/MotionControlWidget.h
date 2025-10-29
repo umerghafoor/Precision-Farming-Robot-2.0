@@ -23,6 +23,9 @@ public:
     bool initialize() override;
     QString displayName() const override { return "Motion Control"; }
 
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
+
 private slots:
     void onSpeedChanged(int value);
     void onMotionPressed();
@@ -39,6 +42,9 @@ private:
     QSlider* m_speedSlider;
     QLabel* m_speedLabel;
     QMap<Motion, QPushButton*> m_buttons;
+    
+    // Velocity feedback display
+    QLabel* m_velocityLabel;
 
     double m_speed; // 0.0 - 1.0 (slider fraction)
     // Differential drive configuration

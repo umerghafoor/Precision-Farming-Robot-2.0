@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QDockWidget>
 #include <QMap>
+#include <QLabel>
 #include <memory>
 
 class WidgetManager;
@@ -55,6 +56,7 @@ private:
     // UI elements
     QAction* m_connectAction;
     bool m_ros2Connected;
+    QLabel* m_statusLabel;
 };
 
 #endif // MAINWINDOW_H

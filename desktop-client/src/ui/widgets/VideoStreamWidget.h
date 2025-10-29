@@ -5,6 +5,8 @@
 #include <QLabel>
 #include <QComboBox>
 #include <QPushButton>
+#include <QElapsedTimer>
+#include <QQueue>
 
 /**
  * @brief Widget for displaying video streams from robot cameras
@@ -24,6 +26,8 @@ private slots:
     void onImageReceived(const QByteArray& imageData, int width, int height);
     void onStreamSourceChanged(int index);
     void onToggleRecording();
+    void onSnapshot();
+    void updateFPS();
 
 private:
     void setupUI();
@@ -31,7 +35,15 @@ private:
     QLabel* m_videoLabel;
     QComboBox* m_streamSelector;
     QPushButton* m_recordButton;
+    QPushButton* m_snapshotButton;
+    QLabel* m_fpsLabel;
     bool m_recording;
+    
+    // FPS calculation
+    QElapsedTimer m_fpsTimer;
+    QQueue<qint64> m_frameTimes;
+    QTimer* m_fpsUpdateTimer;
+    QPixmap m_currentFrame;
 };
 
 #endif // VIDEOSTREAMWIDGET_H
