@@ -35,12 +35,7 @@ protected:
 private slots:
     void onAddVideoStream();
     void onAddMotionControl();
-    void onAddCommandControl();
-    void onAddSensorData();
-    void onAddTwinVisualization();
-    void onRemoveWidget();
     void onToggleROS2Connection();
-    void onToggleSimulation();
     void onAbout();
 
 private:
@@ -59,7 +54,6 @@ private:
 
     // UI elements
     QAction* m_connectAction;
-    QAction* m_simulateAction;
     bool m_ros2Connected;
 };
 

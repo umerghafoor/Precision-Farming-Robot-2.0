@@ -57,25 +57,10 @@ void MainWindow::createMenus()
     QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
     fileMenu->addAction(tr("&Exit"), QKeySequence::Quit, this, &QWidget::close);
 
-    // Widgets menu
-    QMenu* widgetsMenu = menuBar()->addMenu(tr("&Widgets"));
-    widgetsMenu->addAction(tr("Add &Video Stream"), this, &MainWindow::onAddVideoStream);
-    widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
-    widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
-    widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
-    widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
-    widgetsMenu->addSeparator();
-    widgetsMenu->addAction(tr("&Remove Widget"), this, &MainWindow::onRemoveWidget);
-
     // ROS2 menu
     QMenu* ros2Menu = menuBar()->addMenu(tr("&ROS2"));
     m_connectAction = ros2Menu->addAction(tr("&Connect"), this, &MainWindow::onToggleROS2Connection);
     m_connectAction->setCheckable(true);
-
-    // Simulation menu
-    QMenu* simMenu = menuBar()->addMenu(tr("&Simulation"));
-    m_simulateAction = simMenu->addAction(tr("&Start Simulation"), this, &MainWindow::onToggleSimulation);
-    m_simulateAction->setCheckable(true);
 
     // Help menu
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
@@ -87,14 +72,7 @@ void MainWindow::createToolBar()
     QToolBar* toolbar = addToolBar(tr("Main Toolbar"));
     toolbar->setMovable(false);
 
-    toolbar->addAction(tr("Video"), this, &MainWindow::onAddVideoStream);
-    toolbar->addAction(tr("Control"), this, &MainWindow::onAddCommandControl);
-    toolbar->addAction(tr("Motion"), this, &MainWindow::onAddMotionControl);
-    toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
-    toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
-    toolbar->addSeparator();
     toolbar->addAction(m_connectAction);
-    toolbar->addAction(m_simulateAction);
 }
 
 void MainWindow::createStatusBar()
@@ -128,7 +106,7 @@ void MainWindow::setDigitalTwin(DigitalTwin* twin)
     m_digitalTwin = twin;
     
     // Create default layout after all dependencies are set
-    if (m_widgetManager && m_ros2Interface && m_digitalTwin) {
+    if (m_widgetManager && m_ros2Interface) {
         createDefaultLayout();
     }
 }
@@ -137,12 +115,9 @@ void MainWindow::createDefaultLayout()
 {
     Logger::instance().info("Creating default widget layout");
     
-    // Create a sensible default layout
+    // Create a simple 2-panel layout: Video + Motion Control
     onAddVideoStream();      // Left side
-    onAddTwinVisualization(); // Left side (will be tabbed with video)
-    onAddMotionControl();     // Right side
-    onAddCommandControl();    // Right side (will be tabbed with motion)
-    onAddSensorData();        // Bottom
+    onAddMotionControl();    // Right side
     
     Logger::instance().info("Default layout created");
 }
@@ -160,43 +135,14 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
                       QDockWidget::DockWidgetClosable | 
                       QDockWidget::DockWidgetFloatable);
 
-    // Determine dock area based on widget type
-    Qt::DockWidgetArea area = Qt::RightDockWidgetArea;
-    QDockWidget* splitWith = nullptr;
+    // Simple placement: Video on left, Motion control on right
+    Qt::DockWidgetArea area = Qt::LeftDockWidgetArea;
     
-    // Smart placement based on widget type
-    if (title.contains("Video", Qt::CaseInsensitive)) {
-        area = Qt::LeftDockWidgetArea;
-    } else if (title.contains("Twin", Qt::CaseInsensitive)) {
-        area = Qt::LeftDockWidgetArea;
-        // Find video widget to split with
-        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
-            if (it.key().contains("video", Qt::CaseInsensitive)) {
-                splitWith = it.value();
-                break;
-            }
-        }
-    } else if (title.contains("Motion", Qt::CaseInsensitive)) {
+    if (title.contains("Motion", Qt::CaseInsensitive)) {
         area = Qt::RightDockWidgetArea;
-    } else if (title.contains("Command", Qt::CaseInsensitive)) {
-        area = Qt::RightDockWidgetArea;
-        // Find motion widget to split with
-        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
-            if (it.key().contains("_", Qt::CaseInsensitive) && dockWidgetArea(it.value()) == Qt::RightDockWidgetArea) {
-                splitWith = it.value();
-                break;
-            }
-        }
-    } else if (title.contains("Sensor", Qt::CaseInsensitive)) {
-        area = Qt::BottomDockWidgetArea;
     }
     
     addDockWidget(area, dock);
-    
-    // Split with existing widget if found
-    if (splitWith) {
-        splitDockWidget(splitWith, dock, Qt::Vertical);
-    }
     
     m_dockWidgets[widget->widgetId()] = dock;
 
@@ -216,42 +162,12 @@ void MainWindow::onAddVideoStream()
     addWidgetToDock(widget, "Video Stream");
 }
 
-void MainWindow::onAddCommandControl()
-{
-    if (!m_widgetManager) return;
-    
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::CommandControl, this);
-    addWidgetToDock(widget, "Command & Control");
-}
-
 void MainWindow::onAddMotionControl()
 {
     if (!m_widgetManager) return;
 
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::MotionControl, this);
     addWidgetToDock(widget, "Motion Control");
-}
-
-void MainWindow::onAddSensorData()
-{
-    if (!m_widgetManager) return;
-    
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::SensorData, this);
-    addWidgetToDock(widget, "Sensor Data");
-}
-
-void MainWindow::onAddTwinVisualization()
-{
-    if (!m_widgetManager) return;
-    
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::TwinVisualization, this);
-    addWidgetToDock(widget, "Digital Twin");
-}
-
-void MainWindow::onRemoveWidget()
-{
-    // Implementation for removing widgets
-    statusBar()->showMessage(tr("Right-click on widget title to close"), 2000);
 }
 
 void MainWindow::onToggleROS2Connection()
@@ -271,35 +187,17 @@ void MainWindow::onToggleROS2Connection()
     }
 }
 
-void MainWindow::onToggleSimulation()
-{
-    if (!m_digitalTwin) {
-        QMessageBox::warning(this, tr("Error"), tr("Digital Twin not initialized"));
-        m_simulateAction->setChecked(false);
-        return;
-    }
-
-    if (m_simulateAction->isChecked()) {
-        m_digitalTwin->startSimulation();
-        statusBar()->showMessage(tr("Simulation started"), 2000);
-    } else {
-        m_digitalTwin->stopSimulation();
-        statusBar()->showMessage(tr("Simulation stopped"), 2000);
-    }
-}
-
 void MainWindow::onAbout()
 {
     QMessageBox::about(this, tr("About"),
         tr("<h2>Precision Farming Robot</h2>"
            "<p>Desktop Client v1.0.0</p>"
-           "<p>A modular Qt-based interface for robot control and monitoring.</p>"
+           "<p>Robot movement control and camera monitoring interface.</p>"
            "<p>Features:</p>"
            "<ul>"
+           "<li>Live Camera Feed</li>"
+           "<li>Motion Control</li>"
            "<li>ROS2 Integration</li>"
-           "<li>Digital Twin Simulation</li>"
-           "<li>Modular Widget System</li>"
-           "<li>Real-time Sensor Data Visualization</li>"
            "</ul>"));
 }
 
