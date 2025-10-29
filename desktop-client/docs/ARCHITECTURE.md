@@ -2,7 +2,43 @@
 
 ## System Architecture
 
-### High-Level Overview
+### Overall System Overview
+
+The Precision Farming Robot 2.0 is a distributed robotic system with the following architecture:
+
+```txt
+┌─────────────────────────────────────────────────────────────────┐
+│                      User Interfaces                            │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐  │
+│  │ Desktop Client   │  │   Mobile App     │  │   Web UI     │  │
+│  │   (Qt6/C++)      │  │   (Planned)      │  │  (Planned)   │  │
+│  └────────┬─────────┘  └────────┬─────────┘  └──────┬───────┘  │
+└───────────┼──────────────────────┼────────────────────┼─────────┘
+            │                      │                    │
+            └──────────────────────┼────────────────────┘
+                                   │
+                          ┌────────▼────────┐
+                          │   ROS2 Network  │
+                          │   (DDS Layer)   │
+                          └────────┬────────┘
+                                   │
+         ┌─────────────────────────┼─────────────────────────┐
+         │                         │                         │
+    ┌────▼──────┐         ┌───────▼────────┐       ┌───────▼──────┐
+    │ Digital   │         │  Raspberry Pi  │       │   External   │
+    │  Twin     │         │  Robot Brain   │       │   Services   │
+    │Simulation │         │   (ROS2 Jazzy) │       │   (Cloud)    │
+    └───────────┘         └───────┬────────┘       └──────────────┘
+                                  │
+                    ┌─────────────┼─────────────┐
+                    │             │             │
+              ┌─────▼──────┐ ┌───▼────┐ ┌─────▼──────┐
+              │   Motors   │ │Sensors │ │  Encoders  │
+              │ (L298N x4) │ │(MPU6050)│ │  (x4)     │
+              └────────────┘ └────────┘ └────────────┘
+```
+
+### Desktop Client High-Level Architecture
 
 ```txt
 ┌───────────────────────────────────────────────────────────────┐
@@ -26,6 +62,39 @@
     │   ROS2   │          │ Physics  │         │   Qt    │
     │  Runtime │          │Simulator │         │  Widgets│
     └──────────┘          └──────────┘         └─────────┘
+```
+
+### Cross-Component Integration
+
+```txt
+┌──────────────────────────────────────────────────────────────┐
+│                        Desktop Client                        │
+│                      (Local or Remote)                       │
+└─────────────────┬────────────────────────────────────────────┘
+                  │ ROS2 Topics
+                  │ (TCP/UDP via DDS)
+                  │
+┌─────────────────▼────────────────────────────────────────────┐
+│                    Raspberry Pi Robot                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │    Motor     │  │     IMU      │  │   Encoder    │       │
+│  │   Control    │◄─┤    Sensor    │  │   Odometry   │       │
+│  │              │  │              │  │              │       │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │
+│         │                 │                 │               │
+│         └─────────────────┼─────────────────┘               │
+│                           │                                 │
+│                  ┌────────▼────────┐                        │
+│                  │     Robot       │                        │
+│                  │   Controller    │                        │
+│                  │  (Coordinator)  │                        │
+│                  └─────────────────┘                        │
+│                           │                                 │
+│                  ┌────────▼────────┐                        │
+│                  │   GPIO/I2C      │                        │
+│                  │   Hardware      │                        │
+│                  └─────────────────┘                        │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## Module Descriptions
@@ -377,6 +446,195 @@ try {
 
 ---
 
+## Complete System Integration
+
+### Multi-Component Communication
+
+The complete Precision Farming Robot 2.0 system integrates multiple software components:
+
+#### 1. Desktop Client → Robot Communication
+
+```txt
+Desktop Client                 ROS2 DDS                Raspberry Pi
+┌─────────────┐               ┌─────────┐             ┌──────────────┐
+│ROS2Interface│──publish───►  │/cmd_vel │  ──subscribe─►│motor_driver │
+│             │               └─────────┘             │             │
+│             │               ┌─────────┐             │             │
+│             │◄─subscribe──  │/imu/data│  ◄──publish──│imu_node     │
+│             │               └─────────┘             │             │
+│             │               ┌─────────┐             │             │
+│             │◄─subscribe──  │/odom    │  ◄──publish──│encoder_node │
+└─────────────┘               └─────────┘             └──────────────┘
+```
+
+#### 2. Data Flow Patterns
+
+**Control Flow** (User → Robot):
+```
+User Input → Widget → ROS2Interface → /cmd_vel → robot_controller 
+  → motor_driver → GPIO → Motors
+```
+
+**Sensor Flow** (Robot → User):
+```
+Sensors → GPIO/I2C → imu_node/encoder_node → ROS2 Topics 
+  → ROS2Interface → Widgets → UI Display
+```
+
+**Digital Twin Sync**:
+```
+Robot State → ROS2 Topics → ROS2Interface → DigitalTwin 
+  → TwinState → TwinVisualizationWidget
+```
+
+#### 3. Network Topologies
+
+**Local Development**:
+```
+Desktop (localhost) ←→ ROS2 Loopback ←→ Digital Twin Simulator
+```
+
+**Production Deployment**:
+```
+Desktop (WiFi/Ethernet) ←→ ROS2 DDS Network ←→ Raspberry Pi Robot
+```
+
+**Multi-User**:
+```
+Desktop 1 ─┐
+Desktop 2 ─┼─→ ROS2 Network ←→ Raspberry Pi Robot
+Desktop 3 ─┘
+```
+
+### Hardware-Software Integration
+
+#### GPIO Pin Mapping
+
+**Motor Control** (16 pins):
+- Motors 1-4: Each has IN1, IN2 (direction), PWM (speed)
+- Controlled by: `motor_driver` node
+- Command source: `/cmd_vel` topic
+
+**Encoders** (8 pins):
+- 4 encoders: Each has A, B channels (quadrature)
+- Read by: `encoder_node` node
+- Publishes to: `/odom` topic
+
+**I2C Sensors** (I2C bus 1):
+- MPU6050 IMU at address 0x68
+- Read by: `imu_node` node
+- Publishes to: `/imu/data` topic
+
+### System Deployment Options
+
+#### Option 1: Standalone Robot
+```
+Raspberry Pi (Self-contained)
+  ├─ All ROS2 nodes running locally
+  ├─ Optional: Local web interface
+  └─ Autonomous operation mode
+```
+
+#### Option 2: Tethered Operation
+```
+Desktop Client (Development)
+  ├─ ROS2 nodes for visualization
+  ├─ Digital Twin simulation
+  └─ Connected to:
+      └─ Raspberry Pi Robot (Field operation)
+          ├─ Motor control
+          ├─ Sensors
+          └─ Base controller
+```
+
+#### Option 3: Cloud Integration (Future)
+```
+Desktop/Mobile Clients
+    ↓
+Cloud Services (Azure/AWS)
+  ├─ Data logging
+  ├─ Fleet management
+  └─ Remote commands
+    ↓
+Raspberry Pi Robots (Multiple)
+```
+
+### Configuration Management
+
+#### Desktop Client Configuration
+- **Build-time**: CMakeLists.txt (ROS2 enabled/disabled)
+- **Run-time**: Command-line arguments, environment variables
+- **UI**: Widget layouts saved/restored
+
+#### Robot Configuration
+- **Static**: `robot_config.yaml` - Robot parameters
+- **Launch**: `robot.launch.py` - Node startup configuration
+- **Run-time**: ROS2 parameters (can be updated dynamically)
+
+### Error Handling & Recovery
+
+#### Desktop Client
+```cpp
+try {
+    ros2Interface->publishVelocity(x, z);
+} catch (const std::exception& e) {
+    Logger::instance().error("ROS2 publish failed");
+    emit errorOccurred(QString::fromStdString(e.what()));
+    // UI shows error, graceful degradation
+}
+```
+
+#### Robot Nodes
+```cpp
+try {
+    motor_driver_->setSpeed(left, right);
+} catch (const std::runtime_error& e) {
+    RCLCPP_ERROR(this->get_logger(), "Motor control error");
+    // Emergency stop, publish error status
+}
+```
+
+### Performance Characteristics
+
+| Component | Update Rate | Latency | Notes |
+|-----------|-------------|---------|-------|
+| Motor Control | 20 Hz | < 50ms | Velocity commands |
+| IMU Sensor | 50 Hz | < 20ms | High-frequency inertial data |
+| Encoder Odometry | 20 Hz | < 50ms | Position updates |
+| Video Stream | 30 fps | 100-200ms | Depends on network |
+| Digital Twin Sim | 50 Hz | N/A | Local simulation |
+| UI Updates | 10-30 Hz | < 100ms | Visual updates |
+
+### Security Considerations
+
+#### Current Implementation
+- Local network operation (LAN/WiFi)
+- No authentication (development mode)
+- ROS2 DDS security disabled
+
+#### Production Recommendations
+- Enable ROS2 DDS Security (SROS2)
+- Network segmentation (robot VLAN)
+- Certificate-based authentication
+- Encrypted communication
+- Access control lists
+
+---
+
+## Documentation Cross-References
+
+### For Developers
+- **Code Reference**: [CODE_REFERENCE.md](/CODE_REFERENCE.md) - API and class documentation
+- **File Structure**: [FILE_STRUCTURE.md](FILE_STRUCTURE.md) - Project organization
+- **Changelog**: [CHANGELOG.md](/CHANGELOG.md) - Version history
+
+### For Users
+- **Quick Start**: [QUICKSTART.md](../QUICKSTART.md) - Getting started guide
+- **Main README**: [README.md](../README.md) - Overview and build instructions
+- **ROS2 Workspace**: [raspberry-pi/README.md](/raspberry-pi/README.md) - Robot setup
+
+---
+
 This architecture provides:
 
 - ✅ Modularity
@@ -384,3 +642,6 @@ This architecture provides:
 - ✅ Testability
 - ✅ Maintainability
 - ✅ Extensibility
+- ✅ Cross-component integration
+- ✅ Hardware-software abstraction
+- ✅ Distributed operation support
