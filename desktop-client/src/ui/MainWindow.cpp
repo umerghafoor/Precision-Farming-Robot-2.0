@@ -63,6 +63,7 @@ void MainWindow::createMenus()
     widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
     widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
+    widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
     // widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization); // Disabled: Digital Twin widget hidden
     widgetsMenu->addSeparator();
     widgetsMenu->addAction(tr("&Remove Widget"), this, &MainWindow::onRemoveWidget);
@@ -139,6 +140,7 @@ void MainWindow::createDefaultLayout()
     
     // Create a sensible default layout
     onAddVideoStream();      // Left side
+    onAddCoordinates();      // Left side, next to video
     // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
     onAddMotionControl();     // Right side
     onAddCommandControl();    // Right side (will be tabbed with motion)
@@ -167,6 +169,15 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
     // Smart placement based on widget type
     if (title.contains("Video", Qt::CaseInsensitive)) {
         area = Qt::LeftDockWidgetArea;
+    } else if (title.contains("Coordinates", Qt::CaseInsensitive)) {
+        area = Qt::LeftDockWidgetArea;
+        // Find video widget to split with
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.key().contains("video", Qt::CaseInsensitive)) {
+                splitWith = it.value();
+                break;
+            }
+        }
     } else if (title.contains("Twin", Qt::CaseInsensitive)) {
         area = Qt::LeftDockWidgetArea;
         // Find video widget to split with
@@ -238,6 +249,14 @@ void MainWindow::onAddSensorData()
     
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::SensorData, this);
     addWidgetToDock(widget, "Sensor Data");
+}
+
+void MainWindow::onAddCoordinates()
+{
+    if (!m_widgetManager) return;
+    
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::Coordinates, this);
+    addWidgetToDock(widget, "Coordinates");
 }
 
 void MainWindow::onAddTwinVisualization()

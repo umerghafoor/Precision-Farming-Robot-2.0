@@ -64,7 +64,7 @@ void ROS2Interface::setupPublishers()
 void ROS2Interface::setupSubscribers()
 {
 #ifdef USE_ROS2
-    // Image subscriber - subscribing to camera/raw topic
+    // Image subscriber - subscribing to camera/raw topic by default
     m_imageSubscriber = m_node->create_subscription<sensor_msgs::msg::Image>(
         "camera/raw", 10,
         std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
@@ -79,7 +79,37 @@ void ROS2Interface::setupSubscribers()
         "/robot_status", 10,
         std::bind(&ROS2Interface::statusCallback, this, std::placeholders::_1));
 
+    // Coordinates subscriber
+    m_coordinatesSubscriber = m_node->create_subscription<geometry_msgs::msg::PointStamped>(
+        "/coordinates", 10,
+        std::bind(&ROS2Interface::coordinatesCallback, this, std::placeholders::_1));
+
     Logger::instance().debug("ROS2 subscribers created");
+#endif
+}
+
+void ROS2Interface::switchCameraTopic(const QString& topic)
+{
+#ifdef USE_ROS2
+    if (!m_node) {
+        Logger::instance().warning("Cannot switch camera topic - node not initialized");
+        return;
+    }
+
+    // Unsubscribe from current topic
+    if (m_imageSubscriber) {
+        m_imageSubscriber.reset();
+        Logger::instance().debug("Unsubscribed from previous camera topic");
+    }
+
+    // Subscribe to new topic
+    m_imageSubscriber = m_node->create_subscription<sensor_msgs::msg::Image>(
+        topic.toStdString(), 10,
+        std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
+
+    Logger::instance().info(QString("Switched camera subscription to topic: %1").arg(topic));
+#else
+    Logger::instance().debug(QString("Camera topic switch (stub): %1").arg(topic));
 #endif
 }
 
@@ -220,5 +250,13 @@ void ROS2Interface::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 void ROS2Interface::statusCallback(const std_msgs::msg::String::SharedPtr msg)
 {
     emit robotStatusReceived(QString::fromStdString(msg->data));
+}
+
+void ROS2Interface::coordinatesCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
+{
+    emit coordinatesReceived(msg->point.x, msg->point.y);
+    
+    Logger::instance().debug(QString("Coordinates received: X=%1, Y=%2")
+                            .arg(msg->point.x).arg(msg->point.y));
 }
 #endif
