@@ -38,6 +38,7 @@ private slots:
     void onAddMotionControl();
     void onToggleROS2Connection();
     void onAbout();
+    void onChatterMessageReceived(const QString& message);
 
 private:
     void setupUI();

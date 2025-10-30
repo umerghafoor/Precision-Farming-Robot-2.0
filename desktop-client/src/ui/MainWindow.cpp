@@ -107,7 +107,16 @@ void MainWindow::setROS2Interface(ROS2Interface* ros2)
             m_statusLabel->setText("ROS2: Disconnected");
             m_statusLabel->setStyleSheet("QLabel { padding: 3px 8px; background-color: #d32f2f; color: white; border-radius: 3px; }");
         });
+        connect(m_ros2Interface, &ROS2Interface::robotStatusReceived,
+                this, &MainWindow::onChatterMessageReceived);
     }
+}
+
+void MainWindow::onChatterMessageReceived(const QString& message)
+{
+    Logger::instance().info(QString("Received /chatter: %1").arg(message));
+    m_statusLabel->setText(QString("Chatter: %1").arg(message));
+    m_statusLabel->setStyleSheet("QLabel { padding: 3px 8px; background-color: #1976d2; color: white; border-radius: 3px; }");
 }
 
 void MainWindow::setDigitalTwin(DigitalTwin* twin)

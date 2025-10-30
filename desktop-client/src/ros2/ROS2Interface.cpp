@@ -79,6 +79,11 @@ void ROS2Interface::setupSubscribers()
         "/robot_status", 10,
         std::bind(&ROS2Interface::statusCallback, this, std::placeholders::_1));
 
+        // Chatter subscriber
+    m_chatterSubscriber = m_node->create_subscription<std_msgs::msg::String>(
+        "/chatter", 10,
+        std::bind(&ROS2Interface::chatterCallback, this, std::placeholders::_1));
+
     Logger::instance().debug("ROS2 subscribers created");
 #endif
 }
@@ -200,6 +205,11 @@ void ROS2Interface::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 }
 
 void ROS2Interface::statusCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    emit robotStatusReceived(QString::fromStdString(msg->data));
+}
+
+void ROS2Interface::chatterCallback(const std_msgs::msg::String::SharedPtr msg)
 {
     emit robotStatusReceived(QString::fromStdString(msg->data));
 }

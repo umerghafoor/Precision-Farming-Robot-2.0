@@ -75,6 +75,10 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr m_imageSubscriber;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr m_imuSubscriber;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_statusSubscriber;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_chatterSubscriber;
+#ifdef USE_ROS2
+    void chatterCallback(const std_msgs::msg::String::SharedPtr msg);
+#endif
 #else
     std::unique_ptr<QThread> m_ros2Thread;
 #endif
