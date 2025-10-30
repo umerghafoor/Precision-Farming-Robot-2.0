@@ -63,7 +63,7 @@ void MainWindow::createMenus()
     widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
     widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
-    widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
+    // widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization); // Disabled: Digital Twin widget hidden
     widgetsMenu->addSeparator();
     widgetsMenu->addAction(tr("&Remove Widget"), this, &MainWindow::onRemoveWidget);
 
@@ -90,8 +90,8 @@ void MainWindow::createToolBar()
     toolbar->addAction(tr("Video"), this, &MainWindow::onAddVideoStream);
     toolbar->addAction(tr("Control"), this, &MainWindow::onAddCommandControl);
     toolbar->addAction(tr("Motion"), this, &MainWindow::onAddMotionControl);
-    toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
-    toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
+    //toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
+   // toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
     toolbar->addSeparator();
     toolbar->addAction(m_connectAction);
     toolbar->addAction(m_simulateAction);
@@ -139,7 +139,7 @@ void MainWindow::createDefaultLayout()
     
     // Create a sensible default layout
     onAddVideoStream();      // Left side
-    onAddTwinVisualization(); // Left side (will be tabbed with video)
+    // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
     onAddMotionControl();     // Right side
     onAddCommandControl();    // Right side (will be tabbed with motion)
     onAddSensorData();        // Bottom
@@ -242,15 +242,14 @@ void MainWindow::onAddSensorData()
 
 void MainWindow::onAddTwinVisualization()
 {
-    if (!m_widgetManager) return;
-    
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::TwinVisualization, this);
-    addWidgetToDock(widget, "Digital Twin");
+    // Disabled: Digital Twin widget creation is intentionally turned off
+    Logger::instance().info("Digital Twin widget creation is disabled");
+    return;
 }
 
 void MainWindow::onRemoveWidget()
 {
-    // Implementation for removing widgets
+    // Implementation for removing widgetsDigital 
     statusBar()->showMessage(tr("Right-click on widget title to close"), 2000);
 }
 
