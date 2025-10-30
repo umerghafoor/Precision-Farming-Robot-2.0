@@ -19,8 +19,8 @@ public:
     bool initialize() override;
     QString displayName() const override { return "Coordinates"; }
 
-private slots:
-    void onCoordinatesReceived(double x, double y);
+    private slots:
+         void onCoordinatesJsonReceived(const QString& data);
 
 private:
     void setupUI();

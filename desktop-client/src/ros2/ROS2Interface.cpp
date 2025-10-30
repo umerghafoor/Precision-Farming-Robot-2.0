@@ -84,6 +84,11 @@ void ROS2Interface::setupSubscribers()
         "/coordinates", 10,
         std::bind(&ROS2Interface::coordinatesCallback, this, std::placeholders::_1));
 
+    // Coordinates JSON subscriber (for image/coordinates topic)
+    m_coordinatesJsonSubscriber = m_node->create_subscription<std_msgs::msg::String>(
+        "image/coordinates", 10,
+        std::bind(&ROS2Interface::coordinatesJsonCallback, this, std::placeholders::_1));
+
     Logger::instance().debug("ROS2 subscribers created");
 #endif
 }
@@ -258,5 +263,14 @@ void ROS2Interface::coordinatesCallback(const geometry_msgs::msg::PointStamped::
     
     Logger::instance().debug(QString("Coordinates received: X=%1, Y=%2")
                             .arg(msg->point.x).arg(msg->point.y));
+}
+
+void ROS2Interface::coordinatesJsonCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    QString jsonData = QString::fromStdString(msg->data);
+    emit coordinatesJsonReceived(jsonData);
+    
+    Logger::instance().debug(QString("Coordinates JSON received: %1")
+                            .arg(jsonData.left(100))); // Log first 100 chars
 }
 #endif

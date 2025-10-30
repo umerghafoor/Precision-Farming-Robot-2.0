@@ -53,6 +53,7 @@ signals:
     void robotStatusReceived(const QString& status);
     void sensorDataReceived(const QString& sensorType, const QVariantMap& data);
     void coordinatesReceived(double x, double y);
+    void coordinatesJsonReceived(const QString& data);
 
 public slots:
     void start();
@@ -69,6 +70,7 @@ private:
     void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
     void statusCallback(const std_msgs::msg::String::SharedPtr msg);
     void coordinatesCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg);
+    void coordinatesJsonCallback(const std_msgs::msg::String::SharedPtr msg);
 
     std::shared_ptr<rclcpp::Node> m_node;
     std::unique_ptr<QThread> m_ros2Thread;
@@ -82,6 +84,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr m_imuSubscriber;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_statusSubscriber;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr m_coordinatesSubscriber;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_coordinatesJsonSubscriber;
 #else
     std::unique_ptr<QThread> m_ros2Thread;
 #endif

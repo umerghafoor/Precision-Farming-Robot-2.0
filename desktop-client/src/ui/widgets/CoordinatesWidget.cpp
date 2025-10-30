@@ -5,6 +5,10 @@
 #include <QHBoxLayout>
 #include <QGroupBox>
 #include <QFont>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonValue>
 
 CoordinatesWidget::CoordinatesWidget(QWidget *parent)
     : BaseWidget(parent)
@@ -64,24 +68,71 @@ void CoordinatesWidget::setupUI()
 bool CoordinatesWidget::initialize()
 {
     if (m_ros2Interface) {
-        connect(m_ros2Interface, &ROS2Interface::coordinatesReceived,
-                this, &CoordinatesWidget::onCoordinatesReceived);
+        // NOTE: You must implement the signal coordinatesJsonReceived(const QString&) in ROS2Interface
+        connect(m_ros2Interface, SIGNAL(coordinatesJsonReceived(QString)),
+                this, SLOT(onCoordinatesJsonReceived(QString)));
         Logger::instance().info("Coordinates widget initialized");
         return true;
     }
-    
     Logger::instance().warning("Coordinates widget initialized without ROS2");
     return false;
 }
 
-void CoordinatesWidget::onCoordinatesReceived(double x, double y)
+void CoordinatesWidget::onCoordinatesJsonReceived(const QString& data)
 {
+    // Parse the JSON data
+    QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());
+    
+    if (doc.isNull()) {
+        Logger::instance().warning("CoordinatesWidget: Invalid JSON received");
+        return;
+    }
+
+    bool foundMarker = false;
+    double x = 0.0;
+    double y = 0.0;
+    
+    // Check if it's an array or object
+    if (doc.isArray()) {
+        QJsonArray rootArray = doc.array();
+        
+        // Look for the first marker in the array
+        for (const QJsonValue& itemVal : rootArray) {
+            if (!itemVal.isObject() || foundMarker) continue;
+            
+            QJsonObject item = itemVal.toObject();
+            QJsonArray markers = item.value("markers").toArray();
+            
+            if (!markers.isEmpty()) {
+                QJsonObject marker = markers[0].toObject();
+                QJsonObject center = marker.value("center").toObject();
+                x = center.value("x").toDouble();
+                y = center.value("y").toDouble();
+                foundMarker = true;
+                break;
+            }
+        }
+    } else if (doc.isObject()) {
+        // Handle single object case
+        QJsonObject obj = doc.object();
+        QJsonArray markers = obj.value("markers").toArray();
+        
+        if (!markers.isEmpty()) {
+            QJsonObject marker = markers[0].toObject();
+            QJsonObject center = marker.value("center").toObject();
+            x = center.value("x").toDouble();
+            y = center.value("y").toDouble();
+            foundMarker = true;
+        }
+    }
+    
+    // Update the display values
     m_currentX = x;
     m_currentY = y;
-
-    // Update display labels with formatted values
-    m_xValueLabel->setText(QString("%1 m").arg(x, 0, 'f', 2));
-    m_yValueLabel->setText(QString("%1 m").arg(y, 0, 'f', 2));
-
-    Logger::instance().debug(QString("Coordinates updated: X=%1, Y=%2").arg(x).arg(y));
+    m_xValueLabel->setText(QString("%1 px").arg(x, 0, 'f', 2));
+    m_yValueLabel->setText(QString("%1 px").arg(y, 0, 'f', 2));
+    
+    if (foundMarker) {
+        Logger::instance().debug(QString("CoordinatesWidget updated: X=%1, Y=%2").arg(x).arg(y));
+    }
 }

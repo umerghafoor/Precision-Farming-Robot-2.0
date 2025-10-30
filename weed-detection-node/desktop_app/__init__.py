@@ -1,2 +1,0 @@
-# Desktop Application Package
-
