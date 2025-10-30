@@ -4,6 +4,7 @@
 #include "MotionControlWidget.h"
 #include "CommandControlWidget.h"
 #include "SensorDataWidget.h"
+#include "CoordinatesWidget.h"
 #include "TwinVisualizationWidget.h"
 #include "Logger.h"
 
@@ -16,6 +17,7 @@ WidgetManager::WidgetManager(QObject *parent)
     registerWidget(WidgetType::MotionControl, "Motion Control");
     registerWidget(WidgetType::CommandControl, "Command & Control");
     registerWidget(WidgetType::SensorData, "Sensor Data");
+    registerWidget(WidgetType::Coordinates, "Coordinates");
     registerWidget(WidgetType::TwinVisualization, "Digital Twin");
 }
 
@@ -52,6 +54,9 @@ BaseWidget* WidgetManager::createWidget(WidgetType type, QWidget* parent)
             break;
         case WidgetType::SensorData:
             widget = new SensorDataWidget(parent);
+            break;
+        case WidgetType::Coordinates:
+            widget = new CoordinatesWidget(parent);
             break;
         case WidgetType::TwinVisualization:
             widget = new TwinVisualizationWidget(parent);
@@ -115,7 +120,9 @@ QString WidgetManager::generateWidgetId(WidgetType type)
     switch (type) {
         case WidgetType::VideoStream: typeName = "video"; break;
         case WidgetType::CommandControl: typeName = "control"; break;
+        case WidgetType::MotionControl: typeName = "motion"; break;
         case WidgetType::SensorData: typeName = "sensor"; break;
+        case WidgetType::Coordinates: typeName = "coordinates"; break;
         case WidgetType::TwinVisualization: typeName = "twin"; break;
         case WidgetType::Custom: typeName = "custom"; break;
     }

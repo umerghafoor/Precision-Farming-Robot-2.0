@@ -12,6 +12,7 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
 #include <std_msgs/msg/string.hpp>
 #endif
 
@@ -36,6 +37,9 @@ public:
     void publishVelocityCommand(double linear_x, double linear_y, double angular_z);
     void publishRobotCommand(const QString& command);
 
+    // Subscription management
+    void switchCameraTopic(const QString& topic);
+
 signals:
     // Connection status
     void connected();
@@ -48,6 +52,7 @@ signals:
                          double gx, double gy, double gz);
     void robotStatusReceived(const QString& status);
     void sensorDataReceived(const QString& sensorType, const QVariantMap& data);
+    void coordinatesReceived(double x, double y);
 
 public slots:
     void start();
@@ -63,6 +68,7 @@ private:
     void imageCallback(const sensor_msgs::msg::Image::SharedPtr msg);
     void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
     void statusCallback(const std_msgs::msg::String::SharedPtr msg);
+    void coordinatesCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg);
 
     std::shared_ptr<rclcpp::Node> m_node;
     std::unique_ptr<QThread> m_ros2Thread;
@@ -75,6 +81,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr m_imageSubscriber;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr m_imuSubscriber;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_statusSubscriber;
+    rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr m_coordinatesSubscriber;
 #else
     std::unique_ptr<QThread> m_ros2Thread;
 #endif

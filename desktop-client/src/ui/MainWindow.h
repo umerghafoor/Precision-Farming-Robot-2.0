@@ -37,6 +37,7 @@ private slots:
     void onAddMotionControl();
     void onAddCommandControl();
     void onAddSensorData();
+    void onAddCoordinates();
     void onAddTwinVisualization();
     void onRemoveWidget();
     void onToggleROS2Connection();
