@@ -12,7 +12,17 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Use the project root so the container is run from the repository root
+PROJECT_ROOT="/media/sani/work/Coding/Precision-Farming-Robot-2.0"
+if [ -d "$PROJECT_ROOT" ]; then
+  SCRIPT_DIR="$(cd "$PROJECT_ROOT" && pwd)"
+else
+  echo -e "${RED}Error: project root '${PROJECT_ROOT}' not found!${NC}"
+  exit 1
+fi
+echo "PROJECT_ROOT: $PROJECT_ROOT"
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+
 
 echo -e "${GREEN}=== Starting Docker Container ===${NC}"
 echo -e "${YELLOW}Workspace: ${SCRIPT_DIR}${NC}"

@@ -64,9 +64,9 @@ void ROS2Interface::setupPublishers()
 void ROS2Interface::setupSubscribers()
 {
 #ifdef USE_ROS2
-    // Image subscriber
+    // Image subscriber - subscribing to camera/raw topic
     m_imageSubscriber = m_node->create_subscription<sensor_msgs::msg::Image>(
-        "/camera/image_raw", 10,
+        "camera/raw", 10,
         std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
 
     // IMU subscriber
@@ -185,10 +185,28 @@ void ROS2Interface::publishRobotCommand(const QString& command)
 void ROS2Interface::imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
     // Convert ROS image to QByteArray
-    QByteArray imageData(reinterpret_cast<const char*>(msg->data.data()), 
-                         msg->data.size());
+    // Handle both RGB8 and BGR8 encodings
+    QByteArray imageData;
+    
+    if (msg->encoding == "bgr8") {
+        // Convert BGR to RGB
+        imageData.resize(msg->data.size());
+        for (size_t i = 0; i < msg->data.size(); i += 3) {
+            imageData[i] = msg->data[i + 2];     // R
+            imageData[i + 1] = msg->data[i + 1]; // G
+            imageData[i + 2] = msg->data[i];     // B
+        }
+    } else {
+        // Assume RGB8 or compatible format
+        imageData = QByteArray(reinterpret_cast<const char*>(msg->data.data()), 
+                              msg->data.size());
+    }
     
     emit imageReceived(imageData, msg->width, msg->height);
+    
+    Logger::instance().debug(QString("Image received: %1x%2, encoding: %3")
+                            .arg(msg->width).arg(msg->height)
+                            .arg(QString::fromStdString(msg->encoding)));
 }
 
 void ROS2Interface::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)

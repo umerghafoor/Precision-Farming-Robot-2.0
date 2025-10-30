@@ -68,8 +68,12 @@ bool VideoStreamWidget::initialize()
 void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, int height)
 {
     // Convert image data to QImage and display
-    // Assuming RGB8 format
-    if (imageData.size() != width * height * 3) {
+    // Expecting RGB8 format (3 bytes per pixel)
+    int expectedSize = width * height * 3;
+    
+    if (imageData.size() != expectedSize) {
+        Logger::instance().warning(QString("Image size mismatch: expected %1, got %2")
+                                  .arg(expectedSize).arg(imageData.size()));
         return;
     }
 
@@ -78,6 +82,9 @@ void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, 
     
     if (!image.isNull()) {
         m_videoLabel->setPixmap(QPixmap::fromImage(image));
+        m_videoLabel->setText(""); // Clear "No video stream" text
+    } else {
+        Logger::instance().error("Failed to create QImage from received data");
     }
 }
 
