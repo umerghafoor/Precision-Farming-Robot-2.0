@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # ArUco Processor Node
+  aruco_processor:
+    image: weed-detection-node:latest
+    container_name: aruco_processor
+    command: ros2 run weed_detection_node aruco_processor
+    networks:
+      - ros_network
+    environment:
+      - ROS_DOMAIN_ID=0
+    restart: unless-stopped
+
+  # Image Publisher (for testing)
+  image_publisher:
+    image: weed-detection-node:latest
+    container_name: image_publisher
+    command: ros2 run weed_detection_node image_publisher /root/ros2_ws/src/weed_detection_node/test_scene_with_aruco.jpg 1.0
+    networks:
+      - ros_network
+    environment:
+      - ROS_DOMAIN_ID=0
+    depends_on:
+      - aruco_processor
+    restart: unless-stopped
+
+  # Image Viewer (optional - for visual testing)
+  image_viewer:
+    image: weed-detection-node:latest
+    container_name: image_viewer
+    command: ros2 run weed_detection_node image_viewer camera/annotated
+    networks:
+      - ros_network
+    environment:
+      - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    depends_on:
+      - aruco_processor
+    restart: unless-stopped
+
+networks:
+  ros_network:
+    driver: bridge
+
