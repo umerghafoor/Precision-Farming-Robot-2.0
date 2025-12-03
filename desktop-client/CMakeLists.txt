@@ -78,6 +78,7 @@ set(SOURCES
     src/ui/widgets/CommandControlWidget.cpp
     src/ui/widgets/MotionControlWidget.cpp
     src/ui/widgets/SensorDataWidget.cpp
+    src/ui/widgets/CoordinatesWidget.cpp
     src/ui/widgets/TwinVisualizationWidget.cpp
     src/utils/Logger.cpp
 )
@@ -95,6 +96,7 @@ set(HEADERS
     src/ui/widgets/CommandControlWidget.h
     src/ui/widgets/MotionControlWidget.h
     src/ui/widgets/SensorDataWidget.h
+    src/ui/widgets/CoordinatesWidget.h
     src/ui/widgets/TwinVisualizationWidget.h
     src/utils/Logger.h
 )

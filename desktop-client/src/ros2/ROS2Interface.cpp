@@ -64,9 +64,9 @@ void ROS2Interface::setupPublishers()
 void ROS2Interface::setupSubscribers()
 {
 #ifdef USE_ROS2
-    // Image subscriber
+    // Image subscriber - subscribing to camera/raw topic by default
     m_imageSubscriber = m_node->create_subscription<sensor_msgs::msg::Image>(
-        "/camera/image_raw", 10,
+        "camera/raw", 10,
         std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
 
     // IMU subscriber
@@ -79,7 +79,42 @@ void ROS2Interface::setupSubscribers()
         "/robot_status", 10,
         std::bind(&ROS2Interface::statusCallback, this, std::placeholders::_1));
 
+    // Coordinates subscriber
+    m_coordinatesSubscriber = m_node->create_subscription<geometry_msgs::msg::PointStamped>(
+        "/coordinates", 10,
+        std::bind(&ROS2Interface::coordinatesCallback, this, std::placeholders::_1));
+
+    // Coordinates JSON subscriber (for image/coordinates topic)
+    m_coordinatesJsonSubscriber = m_node->create_subscription<std_msgs::msg::String>(
+        "image/coordinates", 10,
+        std::bind(&ROS2Interface::coordinatesJsonCallback, this, std::placeholders::_1));
+
     Logger::instance().debug("ROS2 subscribers created");
+#endif
+}
+
+void ROS2Interface::switchCameraTopic(const QString& topic)
+{
+#ifdef USE_ROS2
+    if (!m_node) {
+        Logger::instance().warning("Cannot switch camera topic - node not initialized");
+        return;
+    }
+
+    // Unsubscribe from current topic
+    if (m_imageSubscriber) {
+        m_imageSubscriber.reset();
+        Logger::instance().debug("Unsubscribed from previous camera topic");
+    }
+
+    // Subscribe to new topic
+    m_imageSubscriber = m_node->create_subscription<sensor_msgs::msg::Image>(
+        topic.toStdString(), 10,
+        std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
+
+    Logger::instance().info(QString("Switched camera subscription to topic: %1").arg(topic));
+#else
+    Logger::instance().debug(QString("Camera topic switch (stub): %1").arg(topic));
 #endif
 }
 
@@ -185,10 +220,28 @@ void ROS2Interface::publishRobotCommand(const QString& command)
 void ROS2Interface::imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
     // Convert ROS image to QByteArray
-    QByteArray imageData(reinterpret_cast<const char*>(msg->data.data()), 
-                         msg->data.size());
+    // Handle both RGB8 and BGR8 encodings
+    QByteArray imageData;
+    
+    if (msg->encoding == "bgr8") {
+        // Convert BGR to RGB
+        imageData.resize(msg->data.size());
+        for (size_t i = 0; i < msg->data.size(); i += 3) {
+            imageData[i] = msg->data[i + 2];     // R
+            imageData[i + 1] = msg->data[i + 1]; // G
+            imageData[i + 2] = msg->data[i];     // B
+        }
+    } else {
+        // Assume RGB8 or compatible format
+        imageData = QByteArray(reinterpret_cast<const char*>(msg->data.data()), 
+                              msg->data.size());
+    }
     
     emit imageReceived(imageData, msg->width, msg->height);
+    
+    Logger::instance().debug(QString("Image received: %1x%2, encoding: %3")
+                            .arg(msg->width).arg(msg->height)
+                            .arg(QString::fromStdString(msg->encoding)));
 }
 
 void ROS2Interface::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
@@ -202,5 +255,22 @@ void ROS2Interface::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
 void ROS2Interface::statusCallback(const std_msgs::msg::String::SharedPtr msg)
 {
     emit robotStatusReceived(QString::fromStdString(msg->data));
+}
+
+void ROS2Interface::coordinatesCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
+{
+    emit coordinatesReceived(msg->point.x, msg->point.y);
+    
+    Logger::instance().debug(QString("Coordinates received: X=%1, Y=%2")
+                            .arg(msg->point.x).arg(msg->point.y));
+}
+
+void ROS2Interface::coordinatesJsonCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    QString jsonData = QString::fromStdString(msg->data);
+    emit coordinatesJsonReceived(jsonData);
+    
+    Logger::instance().debug(QString("Coordinates JSON received: %1")
+                            .arg(jsonData.left(100))); // Log first 100 chars
 }
 #endif

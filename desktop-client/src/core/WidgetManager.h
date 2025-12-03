@@ -24,6 +24,7 @@ public:
         MotionControl,
         CommandControl,
         SensorData,
+        Coordinates,
         TwinVisualization,
         Custom
     };

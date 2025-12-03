@@ -25,9 +25,8 @@ void VideoStreamWidget::setupUI()
     QHBoxLayout* controlLayout = new QHBoxLayout();
     
     m_streamSelector = new QComboBox();
-    m_streamSelector->addItem("Camera 1");
-    m_streamSelector->addItem("Camera 2");
-    m_streamSelector->addItem("Depth Camera");
+    m_streamSelector->addItem("Raw Feed");
+    m_streamSelector->addItem("Annotated Feed");
     connect(m_streamSelector, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &VideoStreamWidget::onStreamSourceChanged);
     
@@ -68,8 +67,12 @@ bool VideoStreamWidget::initialize()
 void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, int height)
 {
     // Convert image data to QImage and display
-    // Assuming RGB8 format
-    if (imageData.size() != width * height * 3) {
+    // Expecting RGB8 format (3 bytes per pixel)
+    int expectedSize = width * height * 3;
+    
+    if (imageData.size() != expectedSize) {
+        Logger::instance().warning(QString("Image size mismatch: expected %1, got %2")
+                                  .arg(expectedSize).arg(imageData.size()));
         return;
     }
 
@@ -78,14 +81,42 @@ void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, 
     
     if (!image.isNull()) {
         m_videoLabel->setPixmap(QPixmap::fromImage(image));
+        m_videoLabel->setText(""); // Clear "No video stream" text
+    } else {
+        Logger::instance().error("Failed to create QImage from received data");
     }
 }
 
 void VideoStreamWidget::onStreamSourceChanged(int index)
 {
-    Logger::instance().info(QString("Stream source changed to: %1")
-                            .arg(m_streamSelector->itemText(index)));
-    // In real implementation, switch ROS2 topic subscription
+    QString selectedTopic;
+    
+    switch (index) {
+        case 0: // Raw Feed
+            selectedTopic = "camera/raw";
+            break;
+        case 1: // Annotated Feed
+            selectedTopic = "camera/annotated";
+            break;
+        default:
+            Logger::instance().warning(QString("Unknown stream index: %1").arg(index));
+            return;
+    }
+    
+    Logger::instance().info(QString("Stream source changed to: %1 (topic: %2)")
+                            .arg(m_streamSelector->itemText(index))
+                            .arg(selectedTopic));
+    
+    // Clear the current video display
+    m_videoLabel->clear();
+    m_videoLabel->setText("Waiting for video stream...");
+    
+    // Switch ROS2 topic subscription
+    if (m_ros2Interface) {
+        m_ros2Interface->switchCameraTopic(selectedTopic);
+    } else {
+        Logger::instance().warning("Cannot switch camera topic - ROS2 interface not available");
+    }
 }
 
 void VideoStreamWidget::onToggleRecording()

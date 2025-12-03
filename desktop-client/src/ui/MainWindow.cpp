@@ -63,7 +63,8 @@ void MainWindow::createMenus()
     widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
     widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
-    widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
+    widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
+    // widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization); // Disabled: Digital Twin widget hidden
     widgetsMenu->addSeparator();
     widgetsMenu->addAction(tr("&Remove Widget"), this, &MainWindow::onRemoveWidget);
 
@@ -90,8 +91,8 @@ void MainWindow::createToolBar()
     toolbar->addAction(tr("Video"), this, &MainWindow::onAddVideoStream);
     toolbar->addAction(tr("Control"), this, &MainWindow::onAddCommandControl);
     toolbar->addAction(tr("Motion"), this, &MainWindow::onAddMotionControl);
-    toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
-    toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
+    //toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
+   // toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
     toolbar->addSeparator();
     toolbar->addAction(m_connectAction);
     toolbar->addAction(m_simulateAction);
@@ -126,6 +127,26 @@ void MainWindow::setROS2Interface(ROS2Interface* ros2)
 void MainWindow::setDigitalTwin(DigitalTwin* twin)
 {
     m_digitalTwin = twin;
+    
+    // Create default layout after all dependencies are set
+    if (m_widgetManager && m_ros2Interface && m_digitalTwin) {
+        createDefaultLayout();
+    }
+}
+
+void MainWindow::createDefaultLayout()
+{
+    Logger::instance().info("Creating default widget layout");
+    
+    // Create a sensible default layout
+    onAddVideoStream();      // Left side
+    onAddCoordinates();      // Left side, next to video
+    // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
+    onAddMotionControl();     // Right side
+    onAddCommandControl();    // Right side (will be tabbed with motion)
+    onAddSensorData();        // Bottom
+    
+    Logger::instance().info("Default layout created");
 }
 
 void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
@@ -141,8 +162,52 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
                       QDockWidget::DockWidgetClosable | 
                       QDockWidget::DockWidgetFloatable);
 
-    // Add to appropriate area
-    addDockWidget(Qt::RightDockWidgetArea, dock);
+    // Determine dock area based on widget type
+    Qt::DockWidgetArea area = Qt::RightDockWidgetArea;
+    QDockWidget* splitWith = nullptr;
+    
+    // Smart placement based on widget type
+    if (title.contains("Video", Qt::CaseInsensitive)) {
+        area = Qt::LeftDockWidgetArea;
+    } else if (title.contains("Coordinates", Qt::CaseInsensitive)) {
+        area = Qt::LeftDockWidgetArea;
+        // Find video widget to split with
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.key().contains("video", Qt::CaseInsensitive)) {
+                splitWith = it.value();
+                break;
+            }
+        }
+    } else if (title.contains("Twin", Qt::CaseInsensitive)) {
+        area = Qt::LeftDockWidgetArea;
+        // Find video widget to split with
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.key().contains("video", Qt::CaseInsensitive)) {
+                splitWith = it.value();
+                break;
+            }
+        }
+    } else if (title.contains("Motion", Qt::CaseInsensitive)) {
+        area = Qt::RightDockWidgetArea;
+    } else if (title.contains("Command", Qt::CaseInsensitive)) {
+        area = Qt::RightDockWidgetArea;
+        // Find motion widget to split with
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.key().contains("_", Qt::CaseInsensitive) && dockWidgetArea(it.value()) == Qt::RightDockWidgetArea) {
+                splitWith = it.value();
+                break;
+            }
+        }
+    } else if (title.contains("Sensor", Qt::CaseInsensitive)) {
+        area = Qt::BottomDockWidgetArea;
+    }
+    
+    addDockWidget(area, dock);
+    
+    // Split with existing widget if found
+    if (splitWith) {
+        splitDockWidget(splitWith, dock, Qt::Vertical);
+    }
     
     m_dockWidgets[widget->widgetId()] = dock;
 
@@ -151,7 +216,7 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
     widget->setDigitalTwin(m_digitalTwin);
     widget->initialize();
 
-    Logger::instance().info(QString("Added widget to dock: %1").arg(title));
+    Logger::instance().info(QString("Added widget to dock: %1 in area %2").arg(title).arg(area));
 }
 
 void MainWindow::onAddVideoStream()
@@ -186,17 +251,24 @@ void MainWindow::onAddSensorData()
     addWidgetToDock(widget, "Sensor Data");
 }
 
-void MainWindow::onAddTwinVisualization()
+void MainWindow::onAddCoordinates()
 {
     if (!m_widgetManager) return;
     
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::TwinVisualization, this);
-    addWidgetToDock(widget, "Digital Twin");
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::Coordinates, this);
+    addWidgetToDock(widget, "Coordinates");
+}
+
+void MainWindow::onAddTwinVisualization()
+{
+    // Disabled: Digital Twin widget creation is intentionally turned off
+    Logger::instance().info("Digital Twin widget creation is disabled");
+    return;
 }
 
 void MainWindow::onRemoveWidget()
 {
-    // Implementation for removing widgets
+    // Implementation for removing widgetsDigital 
     statusBar()->showMessage(tr("Right-click on widget title to close"), 2000);
 }
 

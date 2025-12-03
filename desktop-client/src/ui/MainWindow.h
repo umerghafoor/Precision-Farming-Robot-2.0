@@ -37,6 +37,7 @@ private slots:
     void onAddMotionControl();
     void onAddCommandControl();
     void onAddSensorData();
+    void onAddCoordinates();
     void onAddTwinVisualization();
     void onRemoveWidget();
     void onToggleROS2Connection();
@@ -49,6 +50,7 @@ private:
     void createToolBar();
     void createStatusBar();
     void addWidgetToDock(BaseWidget* widget, const QString& title);
+    void createDefaultLayout();
 
     WidgetManager* m_widgetManager;
     ROS2Interface* m_ros2Interface;
