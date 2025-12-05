@@ -4,29 +4,7 @@
 
 ### High-Level Overview
 
-```txt
-┌───────────────────────────────────────────────────────────────┐
-│                    Qt Application Layer                       │
-│                                                               │
-│  ┌─────────────────────────────────────────────────────────┐  │
-│  │              Application (Facade)                       │  │
-│  │  - Initialization & Orchestration                       │  │
-│  │  - Component Lifecycle Management                       │  │
-│  └──────────┬──────────────┬──────────────┬────────────────┘  │
-│             │              │              │                   │
-│    ┌────────▼────────┐ ┌──▼──────────┐ ┌─▼────────────────┐   │
-│    │  ROS2Interface  │ │DigitalTwin  │ │   MainWindow     │   │
-│    │   (Thread)      │ │   Module    │ │  WidgetManager   │   │
-│    └─────────────────┘ └─────────────┘ └──────────────────┘   │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
-         │                      │                    │
-         │                      │                    │
-    ┌────▼─────┐          ┌────▼─────┐         ┌───▼─────┐
-    │   ROS2   │          │ Physics  │         │   Qt    │
-    │  Runtime │          │Simulator │         │  Widgets│
-    └──────────┘          └──────────┘         └─────────┘
-```
+![Architecture](image.png)
 
 ## Module Descriptions
 

@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Get the directory where this script is located
 # Use the project root so the container is run from the repository root
-PROJECT_ROOT="/media/sani/work/Coding/Precision-Farming-Robot-2.0"
+PROJECT_ROOT="."
 if [ -d "$PROJECT_ROOT" ]; then
   SCRIPT_DIR="$(cd "$PROJECT_ROOT" && pwd)"
 else
