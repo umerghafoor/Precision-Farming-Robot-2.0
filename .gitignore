@@ -5,3 +5,6 @@ desktop-client/app_output.log
 desktop-client/PrecisionFarmingClient.log
 desktop-client/.vscode
 
+desktop-client/src/tests/build/
+weed-detection-node/tests/__pycache__/
+weed-detection-node/weed_detection_node/__pycache__/
