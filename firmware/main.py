@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
-6D Signal USB Serial Master Controller
+6D Signal USB Serial Master Controller with Keyboard Control
 Sends 6-byte signal to Arduino for motor control via USB Serial
+Control using arrow keys: UP, DOWN, LEFT, RIGHT
 Format: [Dir1, Speed1, Dir2, Speed2, Dir3, Speed3]
 """
 
 import serial
 import time
 import sys
+import threading
+from pynput import keyboard
+import curses
+from time import sleep
 
 # Direction constants
 DIR_FORWARD = 0
@@ -127,90 +132,107 @@ class MotorController:
         print("DEBUG: Serial closed")
 
 
-def main():
-    """Main demonstration program"""
-    print("\nInitializing motor controller...")
+class KeyboardController:
+    """Keyboard control handler for arrow keys"""
     
-    # Auto-detect serial port
-    import glob
-    ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+    def __init__(self, motor_controller):
+        self.controller = motor_controller
+        self.current_speed = 180
+        self.turn_speed = 150
+        self.is_moving = False
+        self.current_direction = None
+        
+    def on_press(self, key):
+        """Handle key press events"""
+        try:
+            if key == keyboard.Key.up:
+                if not self.is_moving or self.current_direction != 'forward':
+                    print("\n[KEYBOARD] UP pressed - Moving FORWARD")
+                    self.controller.move_forward(speed=self.current_speed)
+                    self.is_moving = True
+                    self.current_direction = 'forward'
+                    
+            elif key == keyboard.Key.down:
+                if not self.is_moving or self.current_direction != 'backward':
+                    print("\n[KEYBOARD] DOWN pressed - Moving BACKWARD")
+                    self.controller.move_backward(speed=self.current_speed)
+                    self.is_moving = True
+                    self.current_direction = 'backward'
+                    
+            elif key == keyboard.Key.left:
+                if not self.is_moving or self.current_direction != 'left':
+                    print("\n[KEYBOARD] LEFT pressed - Turning LEFT")
+                    self.controller.turn_left(speed=self.turn_speed)
+                    self.is_moving = True
+                    self.current_direction = 'left'
+                    
+            elif key == keyboard.Key.right:
+                if not self.is_moving or self.current_direction != 'right':
+                    print("\n[KEYBOARD] RIGHT pressed - Turning RIGHT")
+                    self.controller.turn_right(speed=self.turn_speed)
+                    self.is_moving = True
+                    self.current_direction = 'right'
+                    
+            elif key == keyboard.Key.space:
+                print("\n[KEYBOARD] SPACE pressed - STOP")
+                self.controller.stop_all()
+                self.is_moving = False
+                self.current_direction = None
+                
+            elif key == keyboard.Key.esc:
+                print("\n[KEYBOARD] ESC pressed - Exiting...")
+                self.controller.stop_all()
+                return False  # Stop listener
+                
+        except Exception as e:
+            print(f"Error handling key press: {e}")
     
-    if not ports:
-        print("ERROR: No Arduino found. Please connect Arduino via USB.")
-        return
-    
-    port = ports[0]
-    print(f"DEBUG: Using port {port}")
-    
-    try:
-        controller = MotorController(port=port, baudrate=115200)
-    except Exception as e:
-        print(f"FATAL: Could not initialize controller: {e}")
-        return
-    
-    try:
-        print("\n" + "=" * 50)
-        print("Starting test sequence...")
-        print("=" * 50)
-        
-        # Test 1: Stop all motors
-        print("\n[TEST 1] Stopping all motors")
-        controller.stop_all()
-        time.sleep(2)
-        
-        # Test 2: Move forward
-        print("\n[TEST 2] Moving forward")
-        controller.move_forward(speed=180)
-        time.sleep(3)
-        
-        # Test 3: Stop
-        print("\n[TEST 3] Stopping")
-        controller.stop_all()
-        time.sleep(1)
-        
-        # Test 4: Move backward
-        print("\n[TEST 4] Moving backward")
-        controller.move_backward(speed=180)
-        time.sleep(3)
-        
-        # Test 5: Stop
-        print("\n[TEST 5] Stopping")
-        controller.stop_all()
-        time.sleep(1)
-        
-        # Test 6: Turn left
-        print("\n[TEST 6] Turning left")
-        controller.turn_left(speed=150)
-        time.sleep(2)
-        
-        # Test 7: Stop
-        print("\n[TEST 7] Stopping")
-        controller.stop_all()
-        time.sleep(1)
-        
-        # Test 8: Turn right
-        print("\n[TEST 8] Turning right")
-        controller.turn_right(speed=150)
-        time.sleep(2)
-        
-        # Test 9: Final stop
-        print("\n[TEST 9] Final stop")
-        controller.stop_all()
-        
-        print("\n" + "=" * 50)
-        print("Test sequence complete!")
-        print("=" * 50)
-        
-    except KeyboardInterrupt:
-        print("\n\nDEBUG: Interrupted by user!")
-        controller.stop_all()
-    except Exception as e:
-        print(f"\nERROR: {e}")
-        controller.stop_all()
-    finally:
-        controller.close()
-        print("\nProgram terminated")
+    def on_release(self, key):
+        """Handle key release events"""
+        try:
+            if key in [keyboard.Key.up, keyboard.Key.down, 
+                      keyboard.Key.left, keyboard.Key.right]:
+                print(f"\n[KEYBOARD] Key released - STOP")
+                self.controller.stop_all()
+                self.is_moving = False
+                self.current_direction = None
+                
+        except Exception as e:
+            print(f"Error handling key release: {e}")
 
+
+def main(stdscr):
+    # Clear screen
+    stdscr.clear()
+    stdscr.nodelay(True)  # Non-blocking input
+    stdscr.keypad(True)   # Enable arrow keys
+
+    print("Ready! Use arrow keys to control the robot...")
+    
+    # Initialize your motor controller
+    controller = MotorController(port="/dev/ttyUSB0", baudrate=115200)
+    
+    try:
+        while True:
+            key = stdscr.getch()
+            
+            if key == curses.KEY_UP:
+                controller.move_forward()
+            elif key == curses.KEY_DOWN:
+                controller.move_backward()
+            elif key == curses.KEY_LEFT:
+                controller.turn_left()
+            elif key == curses.KEY_RIGHT:
+                controller.turn_right()
+            elif key == ord(' '):
+                controller.stop_all()
+            elif key == 27:  # ESC
+                break
+
+            sleep(0.05)  # small delay to reduce CPU usage
+    finally:
+        controller.stop_all()
+        controller.close()
 
 if __name__ == "__main__":
-    main()
+    curses.wrapper(main)
