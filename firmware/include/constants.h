@@ -2,18 +2,18 @@
 #define CONSTANTS_H
 
 // L298N Motor Driver 1 Pins (Left Side)
-#define MOTOR1_IN1 2   // Digital pin 2 -> Motor 1 IN1
-#define MOTOR1_IN2 3   // Digital pin 3 -> Motor 1 IN2
-#define MOTOR1_ENA 5   // PWM pin 5 -> Motor 1 speed control
+#define MOTOR1_IN1 3   // Digital pin 2 -> Motor 1 IN1
+#define MOTOR1_IN2 4   // Digital pin 3 -> Motor 1 IN2
+#define MOTOR1_ENA 2   // PWM pin 5 -> Motor 1 speed control
 
-#define MOTOR2_IN1 4   // Digital pin 4 -> Motor 2 IN1
-#define MOTOR2_IN2 7   // Digital pin 7 -> Motor 2 IN2
-#define MOTOR2_ENB 6   // PWM pin 6 -> Motor 2 speed control
+#define MOTOR2_IN1 6   // Digital pin 4 -> Motor 2 IN1
+#define MOTOR2_IN2 5   // Digital pin 7 -> Motor 2 IN2
+#define MOTOR2_ENB 7   // PWM pin 6 -> Motor 2 speed control
 
 // L298N Motor Driver 2 Pins (Right Side)
-#define MOTOR3_IN1 8   // Digital pin 8 -> Motor 3 IN1
-#define MOTOR3_IN2 9   // Digital pin 9 -> Motor 3 IN2
-#define MOTOR3_ENA 10  // PWM pin 10 -> Motor 3 speed control
+#define MOTOR3_IN1 9   // Digital pin 8 -> Motor 3 IN1
+#define MOTOR3_IN2 10   // Digital pin 9 -> Motor 3 IN2
+#define MOTOR3_ENA 8  // PWM pin 10 -> Motor 3 speed control
 
 #define MOTOR4_IN1 11  // Digital pin 11 -> Motor 4 IN1
 #define MOTOR4_IN2 12  // Digital pin 12 -> Motor 4 IN2

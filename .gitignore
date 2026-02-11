@@ -8,3 +8,14 @@ desktop-client/.vscode
 desktop-client/src/tests/build/
 weed-detection-node/tests/__pycache__/
 weed-detection-node/weed_detection_node/__pycache__/
+raspberry-pi/spi_ros2_bridge/install/spi_ros2_bridge/lib/*
+raspberry-pi/spi_ros2_bridge/install/spi_ros2_bridge
+raspberry-pi/spi_ros2_bridge/build/*
+raspberry-pi/spi_ros2_bridge/install/*
+
+raspberry-pi/spi_ros2_bridge/resource
+raspberry-pi/spi_ros2_bridge/log/latest_build
+raspberry-pi/spi_ros2_bridge/log/latest
+raspberry-pi/spi_ros2_bridge/log/COLCON_IGNORE
+.vscode/settings.json
+firmware/.vscode/extensions.json
