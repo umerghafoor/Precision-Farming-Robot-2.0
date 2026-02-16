@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Start Docker container for Precision Farming Desktop Client
-# This script runs the ros2-jazzy-qt6 container with GUI support
+# This script runs the ros2-humble-qt6 container with GUI support
 
 set -e  # Exit on error
 
@@ -28,8 +28,8 @@ echo -e "${GREEN}=== Starting Docker Container ===${NC}"
 echo -e "${YELLOW}Workspace: ${SCRIPT_DIR}${NC}"
 
 # Check if Docker image exists
-if ! sudo docker images | grep -q "ros2-jazzy-qt6"; then
-    echo -e "${RED}Error: Docker image 'ros2-jazzy-qt6' not found!${NC}"
+if ! sudo docker images | grep -q "ros2-humble-qt6"; then
+    echo -e "${RED}Error: Docker image 'ros2-humble-qt6' not found!${NC}"
     echo -e "${YELLOW}Please build the image first:${NC}"
     echo -e "  ./build_docker.sh"
     exit 1
@@ -45,9 +45,11 @@ sudo docker run -it --rm \
   --network host \
   -e DISPLAY=$DISPLAY \
   -v /tmp/.X11-unix:/tmp/.X11-unix \
-  -v "${SCRIPT_DIR}":/workspace/desktop-client \
+  -v $HOME/.Xauthority:/root/.Xauthority \
+  -v "/home/umer/Precision-Farming-Robot-2.0/desktop-client":/workspace/desktop-client \
   --name precision-farming-client \
-  ros2-jazzy-qt6
+  ros2-humble-qt6 \
+  bash
 
 # Cleanup X11 access after container exits
 echo -e "${GREEN}Cleaning up X11 access...${NC}"

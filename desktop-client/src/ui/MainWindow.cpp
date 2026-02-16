@@ -55,7 +55,9 @@ void MainWindow::createMenus()
 {
     // File menu
     QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(tr("&Exit"), QKeySequence::Quit, this, &QWidget::close);
+    QAction* exitAction = fileMenu->addAction(tr("&Exit"));
+    exitAction->setShortcut(QKeySequence::Quit);
+    connect(exitAction, &QAction::triggered, this, &QWidget::close);
 
     // Widgets menu
     QMenu* widgetsMenu = menuBar()->addMenu(tr("&Widgets"));
