@@ -145,14 +145,32 @@ void MainWindow::createDefaultLayout()
 {
     Logger::instance().info("Creating default widget layout");
     
-    // Create a sensible default layout
-    onAddVideoStream();      // Left side
-    onAddCoordinates();      // Left side, next to video
+    // Build the three-zone layout using the existing dock system.
+    // The order of addition determines splitting behaviour.
+    onAddVideoStream();      // left main video area
+    onAddCoordinates();      // left, split beside video
     // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
-    onAddMotionControl();     // Right side
-    onAddCommandControl();    // Right side (will be tabbed with motion)
-    onAddSensorData();        // Bottom
-    
+    onAddMotionControl();    // right sidebar
+    onAddCommandControl();   // right sidebar (tabbed with motion)
+    onAddSensorData();       // bottom telemetry bar
+
+    // Enforce proportions: video should be ~3× wider than sidebar
+    if (m_dockWidgets.contains("Video Stream") && m_dockWidgets.contains("Motion Control")) {
+        QList<QDockWidget*> docks;
+        docks << m_dockWidgets["Video Stream"] << m_dockWidgets["Motion Control"];
+        QList<int> sizes;
+        sizes << 3 << 1; // relative weights
+        resizeDocks(docks, sizes, Qt::Horizontal);
+    }
+
+    // Fix telemetry bar height to ~160px so it remains visible and constant
+    if (m_dockWidgets.contains("Sensor Data")) {
+        QDockWidget* telemetry = m_dockWidgets["Sensor Data"];
+        telemetry->setMinimumHeight(160);
+        telemetry->setMaximumHeight(160);
+        // On some platforms the dock may still float/rescale; restricting both min/max helps
+    }
+
     Logger::instance().info("Default layout created");
 }
 
