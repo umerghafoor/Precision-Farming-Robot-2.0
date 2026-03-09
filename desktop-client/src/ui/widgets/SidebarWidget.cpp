@@ -29,6 +29,16 @@ SidebarWidget::~SidebarWidget()
 bool SidebarWidget::initialize()
 {
     Logger::instance().info("Sidebar widget initialized");
+
+    // initial connection gating - assume offline until signalled otherwise
+    setMotionEnabled(false);
+
+    // watch for ROS2 connection state if interface already assigned
+    if (m_ros2Interface) {
+        connect(m_ros2Interface, &ROS2Interface::connected, this, [this]() { setMotionEnabled(true); });
+        connect(m_ros2Interface, &ROS2Interface::disconnected, this, [this]() { setMotionEnabled(false); });
+    }
+
     return true;
 }
 
@@ -213,7 +223,24 @@ void SidebarWidget::setupUI()
             QPalette pal = m_emergencyStopButton->palette();
             Logger::instance().debug(QString("Emergency button palette button color: %1").arg(pal.color(QPalette::Button).name()));
         });
-    }
+        // also simulate connection events via ROS2Interface to drive gating
+        QTimer::singleShot(3500, this, [this]() {
+            Logger::instance().debug("SidebarWidget test: simulating ROS2 start (should enable controls)");
+            if (m_ros2Interface) m_ros2Interface->start();
+        });
+        QTimer::singleShot(4500, this, [this]() {
+            Logger::instance().debug("SidebarWidget test: simulating ROS2 stop (should disable controls)");
+            if (m_ros2Interface) m_ros2Interface->stop();
+        });
+        // finally exercise the gating helper directly
+        QTimer::singleShot(6000, this, [this]() {
+            Logger::instance().debug("SidebarWidget test: directly disabling motion controls");
+            setMotionEnabled(false);
+        });
+        QTimer::singleShot(6500, this, [this]() {
+            Logger::instance().debug("SidebarWidget test: directly re-enabling motion controls");
+            setMotionEnabled(true);
+        });    }
 }
 
 
@@ -311,6 +338,22 @@ void SidebarWidget::sendStop()
     if (m_ros2Interface) {
         m_ros2Interface->publishVelocityCommand(0.0, 0.0, 0.0);
     }
+}
+
+
+void SidebarWidget::setMotionEnabled(bool enabled)
+{
+    // motion buttons
+    for (auto btn : m_buttons.values()) {
+        btn->setEnabled(enabled);
+    }
+    // speed and radius controls
+    if (m_speedSlider) m_speedSlider->setEnabled(enabled);
+    if (m_radiusSlider) m_radiusSlider->setEnabled(enabled);
+    // spin controls and pin toggle
+    if (m_spinLeftButton) m_spinLeftButton->setEnabled(enabled);
+    if (m_spinRightButton) m_spinRightButton->setEnabled(enabled);
+    if (m_pinRadioButton) m_pinRadioButton->setEnabled(enabled);
 }
 
 void SidebarWidget::onLinearSpeedChanged(int value)

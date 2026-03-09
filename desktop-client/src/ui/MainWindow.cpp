@@ -4,6 +4,7 @@
 #include "DigitalTwin.h"
 #include "BaseWidget.h"
 #include "Logger.h"
+#include "SidebarWidget.h"
 
 #include <QMenuBar>
 #include <QToolBar>
@@ -265,6 +266,14 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
     widget->setROS2Interface(m_ros2Interface);
     widget->setDigitalTwin(m_digitalTwin);
     widget->initialize();
+
+    // if this is a sidebar control panel, make sure motion gating reflects
+    // current connection state (in case ROS2 was already connected)
+    if (m_ros2Connected) {
+        if (auto sb = qobject_cast<SidebarWidget*>(widget)) {
+            sb->setMotionEnabled(true);
+        }
+    }
 
     Logger::instance().info(QString("Added widget to dock: %1 in area %2").arg(title).arg(area));
 }

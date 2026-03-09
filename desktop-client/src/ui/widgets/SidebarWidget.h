@@ -29,6 +29,9 @@ public:
     bool initialize() override;
     QString displayName() const override { return "Controls"; }
 
+    // control gating from outside (eg, MainWindow)
+    void setMotionEnabled(bool enabled);
+
 private slots:
     // motion control slots
     void onSpeedChanged(int value);
