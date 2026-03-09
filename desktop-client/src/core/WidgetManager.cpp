@@ -3,6 +3,7 @@
 #include "VideoStreamWidget.h"
 #include "MotionControlWidget.h"
 #include "CommandControlWidget.h"
+#include "SidebarWidget.h"
 #include "SensorDataWidget.h"
 #include "CoordinatesWidget.h"
 #include "TwinVisualizationWidget.h"
@@ -14,8 +15,11 @@ WidgetManager::WidgetManager(QObject *parent)
 {
     // Register default widget types
     registerWidget(WidgetType::VideoStream, "Video Stream");
-    registerWidget(WidgetType::MotionControl, "Motion Control");
-    registerWidget(WidgetType::CommandControl, "Command & Control");
+    // unified sidebar replaces the two old control widgets
+    registerWidget(WidgetType::Sidebar, "Controls");
+    // still keep the old types around but do not register them here
+    // registerWidget(WidgetType::MotionControl, "Motion Control");
+    // registerWidget(WidgetType::CommandControl, "Command & Control");
     registerWidget(WidgetType::SensorData, "Sensor Data");
     registerWidget(WidgetType::Coordinates, "Coordinates");
     registerWidget(WidgetType::TwinVisualization, "Digital Twin");
@@ -46,11 +50,16 @@ BaseWidget* WidgetManager::createWidget(WidgetType type, QWidget* parent)
         case WidgetType::VideoStream:
             widget = new VideoStreamWidget(parent);
             break;
+        case WidgetType::Sidebar:
+            widget = new SidebarWidget(parent);
+            break;
         case WidgetType::MotionControl:
-            widget = new MotionControlWidget(parent);
+            // legacy; redirect to unified sidebar
+            widget = new SidebarWidget(parent);
             break;
         case WidgetType::CommandControl:
-            widget = new CommandControlWidget(parent);
+            // legacy; redirect to unified sidebar
+            widget = new SidebarWidget(parent);
             break;
         case WidgetType::SensorData:
             widget = new SensorDataWidget(parent);
@@ -119,6 +128,7 @@ QString WidgetManager::generateWidgetId(WidgetType type)
     QString typeName;
     switch (type) {
         case WidgetType::VideoStream: typeName = "video"; break;
+        case WidgetType::Sidebar: typeName = "controls"; break;
         case WidgetType::CommandControl: typeName = "control"; break;
         case WidgetType::MotionControl: typeName = "motion"; break;
         case WidgetType::SensorData: typeName = "sensor"; break;

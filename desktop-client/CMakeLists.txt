@@ -77,6 +77,7 @@ set(SOURCES
     src/ui/widgets/VideoStreamWidget.cpp
     src/ui/widgets/CommandControlWidget.cpp
     src/ui/widgets/MotionControlWidget.cpp
+    src/ui/widgets/SidebarWidget.cpp
     src/ui/widgets/SensorDataWidget.cpp
     src/ui/widgets/CoordinatesWidget.cpp
     src/ui/widgets/TwinVisualizationWidget.cpp
@@ -97,6 +98,7 @@ set(HEADERS
     src/ui/widgets/VideoStreamWidget.h
     src/ui/widgets/CommandControlWidget.h
     src/ui/widgets/MotionControlWidget.h
+    src/ui/widgets/SidebarWidget.h
     src/ui/widgets/SensorDataWidget.h
     src/ui/widgets/CoordinatesWidget.h
     src/ui/widgets/TwinVisualizationWidget.h

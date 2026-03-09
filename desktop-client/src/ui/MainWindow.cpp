@@ -64,8 +64,10 @@ void MainWindow::createMenus()
     // Widgets menu
     QMenu* widgetsMenu = menuBar()->addMenu(tr("&Widgets"));
     widgetsMenu->addAction(tr("Add &Video Stream"), this, &MainWindow::onAddVideoStream);
-    widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
-    widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
+    widgetsMenu->addAction(tr("Add &Controls"), this, &MainWindow::onAddSidebar);
+    // legacy entries kept for compatibility but hidden from default UI
+    // widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
+    // widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
     widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
     // widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization); // Disabled: Digital Twin widget hidden
@@ -104,8 +106,9 @@ void MainWindow::createToolBar()
     toolbar->setMovable(false);
 
     toolbar->addAction(tr("Video"), this, &MainWindow::onAddVideoStream);
-    toolbar->addAction(tr("Control"), this, &MainWindow::onAddCommandControl);
-    toolbar->addAction(tr("Motion"), this, &MainWindow::onAddMotionControl);
+    toolbar->addAction(tr("Controls"), this, &MainWindow::onAddSidebar);
+    // toolbar->addAction(tr("Control"), this, &MainWindow::onAddCommandControl);
+    // toolbar->addAction(tr("Motion"), this, &MainWindow::onAddMotionControl);
     //toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
    // toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
     toolbar->addSeparator();
@@ -173,14 +176,13 @@ void MainWindow::createDefaultLayout()
     onAddVideoStream();      // left main video area
     onAddCoordinates();      // left, split beside video
     // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
-    onAddMotionControl();    // right sidebar
-    onAddCommandControl();   // right sidebar (tabbed with motion)
+    onAddSidebar();          // right sidebar unified control panel
     onAddSensorData();       // bottom telemetry bar
 
     // Enforce proportions: video should be ~3× wider than sidebar
-    if (m_dockWidgets.contains("Video Stream") && m_dockWidgets.contains("Motion Control")) {
+    if (m_dockWidgets.contains("Video Stream") && m_dockWidgets.contains("Controls")) {
         QList<QDockWidget*> docks;
-        docks << m_dockWidgets["Video Stream"] << m_dockWidgets["Motion Control"];
+        docks << m_dockWidgets["Video Stream"] << m_dockWidgets["Controls"];
         QList<int> sizes;
         sizes << 3 << 1; // relative weights
         resizeDocks(docks, sizes, Qt::Horizontal);
@@ -267,34 +269,39 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
     Logger::instance().info(QString("Added widget to dock: %1 in area %2").arg(title).arg(area));
 }
 
-void MainWindow::onAddVideoStream()
-{
-    if (!m_widgetManager) return;
-    
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::VideoStream, this);
-    addWidgetToDock(widget, "Video Stream");
-}
 
 void MainWindow::onAddCommandControl()
 {
+    Logger::instance().info("CommandControl widget deprecated; using unified sidebar instead");
+    onAddSidebar();
+}
+
+void MainWindow::onAddSidebar()
+{
     if (!m_widgetManager) return;
-    
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::CommandControl, this);
-    addWidgetToDock(widget, "Command & Control");
+
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::Sidebar, this);
+    addWidgetToDock(widget, "Controls");
 }
 
 void MainWindow::onAddMotionControl()
 {
+    Logger::instance().info("MotionControl widget deprecated; using unified sidebar instead");
+    onAddSidebar();
+}
+
+void MainWindow::onAddVideoStream()
+{
     if (!m_widgetManager) return;
 
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::MotionControl, this);
-    addWidgetToDock(widget, "Motion Control");
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::VideoStream, this);
+    addWidgetToDock(widget, "Video Stream");
 }
 
 void MainWindow::onAddSensorData()
 {
     if (!m_widgetManager) return;
-    
+
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::SensorData, this);
     addWidgetToDock(widget, "Sensor Data");
 }
@@ -302,10 +309,12 @@ void MainWindow::onAddSensorData()
 void MainWindow::onAddCoordinates()
 {
     if (!m_widgetManager) return;
-    
+
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::Coordinates, this);
     addWidgetToDock(widget, "Coordinates");
 }
+
+
 
 void MainWindow::onAddTwinVisualization()
 {

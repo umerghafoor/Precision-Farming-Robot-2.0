@@ -38,8 +38,9 @@ protected:
 
 private slots:
     void onAddVideoStream();
-    void onAddMotionControl();
-    void onAddCommandControl();
+    void onAddMotionControl();   // deprecated: forwards to sidebar
+    void onAddCommandControl();  // deprecated: forwards to sidebar
+    void onAddSidebar();         // unified controls panel
     void onAddSensorData();
     void onAddCoordinates();
     void onAddTwinVisualization();
