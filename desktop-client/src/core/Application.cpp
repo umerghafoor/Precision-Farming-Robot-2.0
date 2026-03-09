@@ -5,6 +5,11 @@
 #include "DigitalTwin.h"
 #include "Logger.h"
 
+#include <QApplication>
+#include <QFont>
+#include <QFile>
+#include <QTextStream>
+
 Application::Application(int argc, char** argv, QObject *parent)
     : QObject(parent)
     , m_argc(argc)
@@ -84,9 +89,27 @@ bool Application::initializeDigitalTwin()
     }
 }
 
+#include <QApplication>
+
 bool Application::initializeUI()
 {
     try {
+        // set global application font stack before any widgets are created
+        QFont appFont;
+        // Qt supports comma-separated families; the system will pick the first available
+        appFont.setFamily("Inter,Segoe UI,Ubuntu,sans-serif");
+        qApp->setFont(appFont);
+
+        // apply global stylesheet from resources; theme.qss should be added to the .qrc
+        QFile f(":/theme.qss");
+        if (f.open(QFile::ReadOnly | QFile::Text)) {
+            QTextStream ts(&f);
+            qApp->setStyleSheet(ts.readAll());
+            Logger::instance().info("Global theme stylesheet applied");
+        } else {
+            Logger::instance().warning("Unable to open theme.qss resource");
+        }
+
         // Create widget manager
         m_widgetManager = std::make_unique<WidgetManager>();
 

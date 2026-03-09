@@ -1,290 +1,134 @@
-# Precision Farming Robot - Desktop Client
+# Precision Farming Robot — Desktop Client
 
-A professional, modular Qt6-based desktop application for controlling and monitoring the Precision Farming Robot with ROS2 integration and Digital Twin simulation capabilities.
+Qt6 desktop app for robot control, telemetry, and simulation, with optional ROS2 integration.
 
-## 🏗️ Architecture Overview
+## TL;DR
 
-This application follows a **clean, modular architecture** with clear separation of concerns:
+- Stack: C++17 + Qt6 (`Core`, `Gui`, `Widgets`, `Network`), optional Qt Multimedia, optional ROS2.
+- Entry flow: `main.cpp` → `Application` → `ROS2Interface` → `DigitalTwin` → `MainWindow`.
+- UI model: dockable widget workspace managed by `WidgetManager`.
+- ROS2 mode is optional: if ROS2 is not sourced/found, app builds and runs in stub/standalone mode.
 
-![alt text](docs/image.png)
+## Core Capabilities
 
-### Key Design Patterns
+- Modular dockable widgets (add/remove/rearrange at runtime).
+- Robot command publishing (`/cmd_vel`, `/robot_command`).
+- Real-time telemetry subscriptions (camera, IMU, status, coordinates).
+- Digital Twin modes:
+  - `Synchronized` (mirrors ROS2 updates)
+  - `Simulated` (internal simulation)
+  - `Offline`
+- Structured logging to `PrecisionFarmingClient.log`.
 
-1. **Facade Pattern** - Application class provides unified interface
-2. **Factory Pattern** - WidgetManager creates widgets dynamically
-3. **Observer Pattern** - Qt signals/slots for event handling
-4. **Strategy Pattern** - Digital Twin modes (Synchronized/Simulated/Offline)
-5. **Singleton Pattern** - Logger utility
+## Widget Set (Current)
 
-## 📁 Project Structure
+Registered by default in `WidgetManager`:
 
-```
-desktop-client/
-├── CMakeLists.txt              # Build configuration
-├── package.xml                 # ROS2 package manifest
-├── README.md                   # This file
-│
-├── src/
-│   ├── main.cpp               # Application entry point
-│   │
-│   ├── core/                  # Core application framework
-│   │   ├── Application.h/cpp  # Main application orchestrator
-│   │   └── WidgetManager.h/cpp # Widget factory & registry
-│   │
-│   ├── ros2/                  # ROS2 Integration (isolated)
-│   │   └── ROS2Interface.h/cpp # ROS2 communication layer
-│   │
-│   ├── twin/                  # Digital Twin Module (isolated)
-│   │   ├── DigitalTwin.h/cpp  # Main twin controller
-│   │   ├── TwinState.h/cpp    # State management
-│   │   └── TwinSimulator.h/cpp # Physics simulation
-│   │
-│   ├── ui/                    # User Interface
-│   │   ├── MainWindow.h/cpp   # Main application window
-│   │   └── widgets/           # Modular widget system
-│   │       ├── BaseWidget.h/cpp              # Widget base class
-│   │       ├── VideoStreamWidget.h/cpp       # Camera feeds
-│   │       ├── CommandControlWidget.h/cpp    # Robot control
-│   │       ├── SensorDataWidget.h/cpp        # Sensor display
-│   │       └── TwinVisualizationWidget.h/cpp # Digital twin
-│   │
-│   └── utils/                 # Utilities
-│       └── Logger.h/cpp       # Logging system
-│
-└── resources/                 # Resources (future)
-    └── ui/
-```
+- `Video Stream`
+- `Motion Control`
+- `Command & Control`
+- `Sensor Data`
+- `Coordinates`
+- `Digital Twin` (type exists, but UI creation is currently disabled in `MainWindow`)
 
-## 🎯 Key Features
+## ROS2 Contract (Code-Accurate)
 
-### 1. **Modular Widget System**
-- **Fully dockable** widgets using Qt's QDockWidget
-- **Add/remove widgets** dynamically at runtime
-- **Rearrangeable** workspace - drag and drop to organize
-- **Four core widgets:**
-  - 📹 Video Stream Widget
-  - 🎮 Command & Control Widget
-  - 📊 Sensor Data Widget
-  - 🤖 Digital Twin Visualization Widget
+### Published
 
-### 2. **ROS2 Integration**
-- **Threaded ROS2** interface (non-blocking)
-- **Publishers:** Velocity commands, robot commands
-- **Subscribers:** Camera images, IMU data, status updates
-- **Seamless Qt integration** via signals/slots
+- `/cmd_vel` (`geometry_msgs/msg/Twist`)
+- `/robot_command` (`std_msgs/msg/String`)
 
-### 3. **Digital Twin**
-- **Three operating modes:**
-  - **Synchronized:** Real-time sync with physical robot
-  - **Simulated:** Run physics simulation independently
-  - **Offline:** No connection
-- **State management:** Position, velocity, sensors, battery
-- **Physics simulation:** Basic kinematics and sensor modeling
+### Subscribed
 
-### 4. **Scalability Features**
-- **Clean separation** between ROS2, Twin, and UI
-- **Easy to extend** with new widgets
-- **Plugin-ready** architecture
-- **SOLID principles** throughout
+- `camera/raw` (`sensor_msgs/msg/Image`)
+- `/imu/data` (`sensor_msgs/msg/Imu`)
+- `/robot_status` (`std_msgs/msg/String`)
+- `/coordinates` (`geometry_msgs/msg/PointStamped`)
+- `image/coordinates` (`std_msgs/msg/String`, JSON payload)
 
-## 🛠️ Building the Application
+### Notes
 
-### Prerequisites
+- Image encoding handling: if incoming encoding is `bgr8`, it is converted to RGB before Qt signal emission.
+- ROS2 spinning runs on a dedicated `QThread` with a `QTimer` at 10 ms (`spin_some` loop).
+- Camera topic can be switched dynamically via `ROS2Interface::switchCameraTopic(...)`.
+
+## Build
+
+From `desktop-client/`:
 
 ```bash
-# Install Qt6
-sudo apt install qt6-base-dev qt6-multimedia-dev
-
-# Install ROS2 (Humble/Iron/Jazzy)
-# Follow: https://docs.ros.org/
-
-# Install dependencies
-sudo apt install build-essential cmake
+./build.sh clean debug
+# or
+./build.sh clean release
 ```
 
-### Build Instructions
+What `build.sh` does:
+
+- Detects ROS2 using `ROS_DISTRO`.
+- Sets `-DUSE_ROS2=OFF` automatically when ROS2 is not sourced.
+- Configures CMake and builds `build/PrecisionFarmingDesktopClient`.
+
+### Manual CMake (optional)
 
 ```bash
-# Source ROS2
-source /opt/ros/<distro>/setup.bash
-
-# Navigate to workspace
-cd /path/to/Precision-Farming-Robot-2.0/desktop-client
-
-# Build with colcon (ROS2 way)
-colcon build
-
-# Or build with CMake directly
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DUSE_ROS2=ON
+make -j"$(nproc)"
 ```
 
-### Run the Application
+## Run
 
 ```bash
-# Source the workspace
-source install/setup.bash
-
-# Run
-./build/PrecisionFarmingDesktopClient
-
-# Or if built with colcon
-ros2 run precision_farming_desktop_client PrecisionFarmingDesktopClient
+./run.sh
 ```
 
-## 🎮 Usage Guide
+- Auto-builds if executable is missing.
+- Runs in standalone mode when ROS2 is unavailable.
+- Prints last log entries on exit.
 
-### Starting the Application
+## Runtime UX Summary
 
-1. **Launch the client**
-2. **Add widgets** via Menu: Widgets → Add [Widget Type]
-3. **Connect to ROS2**: ROS2 → Connect
-4. **Start simulation** (optional): Simulation → Start Simulation
+- Main window starts with a default dock layout (video/coordinates left, controls right, sensor bottom).
+- Menu groups: `File`, `Widgets`, `ROS2`, `Simulation`, `Help`.
+- ROS2 connection is toggled from the UI (`Connect` action).
+- Simulation is toggled from the UI (`Start Simulation` action).
 
-### Widget Operations
+## Project Map
 
-- **Drag & drop** widget titles to rearrange
-- **Float widgets** by dragging them out
-- **Close widgets** by clicking the X on the widget title
-- **Add multiple** instances of the same widget type
+- `src/main.cpp` — Qt app bootstrap + logger init.
+- `src/core/Application.*` — lifecycle orchestration and dependency wiring.
+- `src/core/WidgetManager.*` — widget registration/factory/active instances.
+- `src/ros2/ROS2Interface.*` — ROS2 pub/sub + Qt bridge.
+- `src/twin/DigitalTwin.*` — twin mode/state and simulation control.
+- `src/ui/MainWindow.*` — menus, docking, default layout.
+- `src/ui/widgets/*` — per-widget UI and behavior.
+- `src/utils/Logger.*` — centralized logging.
 
-### Command & Control
+## Extension Checklist
 
-- Use **sliders** to control robot velocity
-- **STOP button** - Normal stop
-- **EMERGENCY STOP** - Immediate halt + ROS2 command
+### Add a new widget
 
-### Digital Twin Modes
+1. Create widget class deriving from `BaseWidget`.
+2. Register enum/name and factory case in `WidgetManager`.
+3. Add source/header to `CMakeLists.txt`.
+4. Expose menu/toolbar action in `MainWindow` if needed.
 
-- **Synchronized**: Mirrors real robot state from ROS2
-- **Simulated**: Runs independent simulation
-- **Offline**: Disconnected state
+### Add a ROS2 topic
 
-## 🔧 Extending the Application
+1. Add publisher/subscriber in `ROS2Interface`.
+2. Bridge data through Qt signals.
+3. Consume in widgets and/or `DigitalTwin`.
 
-### Adding a New Widget
+## Requirements
 
-1. **Create widget class** inheriting from `BaseWidget`:
+- Linux (Ubuntu recommended)
+- CMake >= 3.16
+- C++17 toolchain
+- Qt6 base development packages
+- Optional: ROS2 (for live robot integration)
 
-```cpp
-// MyCustomWidget.h
-#include "BaseWidget.h"
+## Troubleshooting
 
-class MyCustomWidget : public BaseWidget {
-    Q_OBJECT
-public:
-    explicit MyCustomWidget(QWidget *parent = nullptr);
-    bool initialize() override;
-    QString displayName() const override { return "My Widget"; }
-private:
-    void setupUI();
-};
-```
-
-2. **Register in WidgetManager**:
-
-```cpp
-// In WidgetManager.h - add enum
-enum class WidgetType {
-    // ... existing types
-    MyCustomWidget
-};
-
-// In WidgetManager.cpp - add to factory
-case WidgetType::MyCustomWidget:
-    widget = new MyCustomWidget(parent);
-    break;
-```
-
-3. **Add to CMakeLists.txt**:
-
-```cmake
-set(SOURCES
-    # ... existing sources
-    src/ui/widgets/MyCustomWidget.cpp
-)
-```
-
-### Adding ROS2 Topics
-
-Edit `src/ros2/ROS2Interface.cpp`:
-
-```cpp
-// Add subscriber
-m_mySubscriber = m_node->create_subscription<MyMsgType>(
-    "/my_topic", 10,
-    std::bind(&ROS2Interface::myCallback, this, std::placeholders::_1));
-```
-
-## 📊 System Requirements
-
-- **OS:** Linux (Ubuntu 20.04/22.04 recommended)
-- **Qt:** 6.2 or higher
-- **ROS2:** Humble/Iron/Jazzy
-- **C++:** C++17 or higher
-- **RAM:** 4GB minimum, 8GB recommended
-- **CPU:** Multi-core recommended for simulation
-
-## 🔍 Debugging
-
-### Enable Verbose Logging
-
-```cpp
-// In main.cpp
-Logger::instance().setLogLevel(Logger::Level::Debug);
-```
-
-### Check Log File
-
-```bash
-tail -f PrecisionFarmingClient.log
-```
-
-## 📝 Code Quality
-
-- ✅ **RAII** principles for resource management
-- ✅ **Smart pointers** (std::unique_ptr) for ownership
-- ✅ **Const correctness** throughout
-- ✅ **Qt signals/slots** for loose coupling
-- ✅ **Comprehensive logging**
-- ✅ **Thread-safe** ROS2 integration
-
-## 🚀 Future Enhancements
-
-- [ ] 3D visualization using Qt3D or OpenGL
-- [ ] Plugin system for third-party widgets
-- [ ] Configuration persistence (save/load layouts)
-- [ ] Video recording functionality
-- [ ] Data logging and playback
-- [ ] Map visualization
-- [ ] Path planning interface
-- [ ] Multi-robot support
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
-## 🤝 Contributing
-
-1. Follow existing code style
-2. Add documentation for new features
-3. Test with both ROS2 and simulation modes
-4. Update README for significant changes
-
-## 📞 Support
-
-For issues and questions, please create an issue on the GitHub repository.
-
----
-
-**Built with ❤️ for Precision Agriculture**
-- Mission planning and analysis
-
-## Setup
-
-Instructions for setting up the desktop client will be added here.
-
-## Usage
-
-Usage instructions will be added here.
+- Build without ROS2 intentionally: leave ROS2 unsourced, then run `./build.sh`.
+- If camera appears wrong-color, verify source encoding (`bgr8` vs `rgb8`).
+- Check logs in `PrecisionFarmingClient.log` for startup/init/connectivity issues.

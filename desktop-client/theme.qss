@@ -1,0 +1,27 @@
+/* WeedX desktop client global theme (task 1 stub)
+   Minimal palette just for bootstrap; full tokens will be added in Task 2.
+*/
+
+/* base colours */
+QWidget {
+    background-color: #0D1A0C;
+    color: #E4F0E3;
+}
+
+QMainWindow, QDialog, QMenu, QMenuBar, QToolBar {
+    background-color: #0D1A0C;
+    color: #E4F0E3;
+}
+
+/* ensure line edits and text widgets also match */
+QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox,
+QSlider, QComboBox {
+    background-color: #142213;
+    color: #E4F0E3;
+    border: 1px solid #2A3D29;
+}
+
+/* placeholder styling example */
+QLabel {
+    color: #E4F0E3;
+}

@@ -81,6 +81,7 @@ set(SOURCES
     src/ui/widgets/CoordinatesWidget.cpp
     src/ui/widgets/TwinVisualizationWidget.cpp
     src/utils/Logger.cpp
+    resources.qrc
 )
 
 set(HEADERS
