@@ -12,6 +12,7 @@
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QLabel>
+#include <QToolButton>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -97,6 +98,10 @@ void MainWindow::createToolBar()
    // toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
     toolbar->addSeparator();
     toolbar->addAction(m_connectAction);
+    // style hook: name the underlying toolbutton created for the connect action
+    if (auto btn = qobject_cast<QToolButton*>(toolbar->widgetForAction(m_connectAction))) {
+        btn->setObjectName("connectButton");
+    }
     toolbar->addAction(m_simulateAction);
 }
 

@@ -1,8 +1,35 @@
 /* WeedX desktop client global theme (task 1 stub)
-   Minimal palette just for bootstrap; full tokens will be added in Task 2.
+   Task 2: full palette tokens and core component styling
+
+   Colour tokens derived from PRD section 5.1. Comments include the
+   token name for clarity; Qt style sheets have no variables so we
+   repeat hex codes where necessary.
 */
 
-/* base colours */
+/* ------------------------------------------------------------------
+   Palette tokens
+   ------------------------------------------------------------------
+*/
+/* --bg          */ /* #0D1A0C */
+/* --surface     */ /* #142213 */
+/* --surface-2   */ /* #1B2E1A */
+/* --surface-3   */ /* #223B21 */
+/* --border      */ /* #2A3D29 */
+/* --green       */ /* #3D8B37 */
+/* --green-lit   */ /* #52C44A */
+/* --green-dim   */ /* #2A6126 */
+/* --text        */ /* #E4F0E3 */
+/* --text-dim    */ /* #7A9B79 */
+/* --text-mute   */ /* #4A6B49 */
+/* --red         */ /* #E05050 */
+/* --amber       */ /* #D4882A */
+/* --amber-dim   */ /* #A3621F */
+/* --amber-lit   */ /* #FFA726 */
+
+/* ------------------------------------------------------------------
+   Base surfaces
+   ------------------------------------------------------------------
+*/
 QWidget {
     background-color: #0D1A0C;
     color: #E4F0E3;
@@ -13,15 +40,165 @@ QMainWindow, QDialog, QMenu, QMenuBar, QToolBar {
     color: #E4F0E3;
 }
 
-/* ensure line edits and text widgets also match */
-QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox,
-QSlider, QComboBox {
+/* Panel cards and group boxes use "surface" with a border and rounded
+   corners to emulate mobile-style cards. */
+QGroupBox, QFrame.card {
     background-color: #142213;
     color: #E4F0E3;
     border: 1px solid #2A3D29;
+    border-radius: 8px;
+    margin-top: 6px;
 }
 
-/* placeholder styling example */
-QLabel {
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 8px;
+    padding: 0 4px;
+    color: #4A6B49; /* --text-mute */
+    font: 10px "Inter", sans-serif;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------------
+   Buttons (generic + object-specific)
+   ------------------------------------------------------------------
+*/
+QPushButton {
+    background-color: #1B2E1A; /* surface-2 */
+    color: #E4F0E3;
+    border: 1px solid #2A3D29;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font: 12px "Inter", sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+QPushButton:hover {
+    background-color: #223B21; /* surface-3 */
+}
+QPushButton:pressed {
+    background-color: #2A3D29;
+}
+QPushButton:disabled {
+    background-color: #0D1A0C;
+    color: #7A9B79;
+    border-color: #4A6B49;
+}
+
+/* control-specific object names */
+#stopButton {
+    border: 2px solid #D4882A; /* amber */
+    background-color: transparent;
+    color: #D4882A;
+}
+#stopButton:hover { background-color: #A3621F; }
+#stopButton:pressed { background-color: #FFA726; }
+
+#emergencyStopButton {
+    background-color: #E05050;
+    color: #FFFFFF;
+    border: 2px solid #E05050;
+}
+#emergencyStopButton:hover { background-color: #C04040; }
+#emergencyStopButton:pressed { background-color: #A03030; }
+
+#connectButton {
+    background-color: #2A6126; /* --green-dim */
+    color: #E4F0E3;
+    border: 2px solid #2A6126;
+}
+#connectButton:hover { background-color: #3D8B37; /* --green */ }
+#connectButton:checked, #connectButton:pressed { background-color: #52C44A; }
+
+/* ------------------------------------------------------------------
+   Sliders
+   ------------------------------------------------------------------
+*/
+QSlider::groove:horizontal {
+    border: 1px solid #2A3D29;
+    height: 8px;
+    background: #142213;
+}
+QSlider::handle:horizontal {
+    background: #3D8B37;
+    border: 1px solid #2A3D29;
+    width: 14px;
+    margin: -4px 0;
+    border-radius: 7px;
+}
+
+/* ------------------------------------------------------------------
+   Scrollbars
+   ------------------------------------------------------------------
+*/
+QScrollBar:horizontal, QScrollBar:vertical {
+    background: #0D1A0C;
+    width: 12px;
+    height: 12px;
+    margin: 0px;
+}
+QScrollBar::handle:horizontal, QScrollBar::handle:vertical {
+    background: #2A3D29;
+    min-width: 20px;
+    min-height: 20px;
+    border-radius: 6px;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    background: none;
+}
+
+/* ------------------------------------------------------------------
+   Status dots (small round indicators)
+   ------------------------------------------------------------------
+*/
+.status-dot {
+    background-color: #E05050;
+    border-radius: 5px;
+    min-width: 10px;
+    min-height: 10px;
+}
+.status-dot.connected { background-color: #52C44A; }
+.status-dot.offline   { background-color: #4A6B49; }
+
+/* ------------------------------------------------------------------
+   Additional UI tweaks
+   ------------------------------------------------------------------
+*/
+QLabel.section-title {
+    color: #4A6B49;
+    font: 10px "Inter", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+QToolBar {
+    background-color: #142213;
+    border-bottom: 1px solid #2A3D29;
+}
+
+QMenuBar {
+    background-color: #142213;
     color: #E4F0E3;
 }
+
+QMenu {
+    background-color: #142213;
+    color: #E4F0E3;
+}
+
+/* tab bar for video source selector etc. */
+QTabBar::tab {
+    background: #1B2E1A;
+    color: #E4F0E3;
+    padding: 6px 12px;
+    border: 1px solid #2A3D29;
+    border-radius: 4px 4px 0 0;
+}
+QTabBar::tab:selected {
+    background: #223B21;
+}
+
+/* end of theme.qss */
