@@ -37,6 +37,9 @@ bool SidebarWidget::initialize()
     if (m_ros2Interface) {
         connect(m_ros2Interface, &ROS2Interface::connected, this, [this]() { setMotionEnabled(true); });
         connect(m_ros2Interface, &ROS2Interface::disconnected, this, [this]() { setMotionEnabled(false); });
+        // subscribe to coordinates updates
+        connect(m_ros2Interface, &ROS2Interface::coordinatesReceived,
+                this, &SidebarWidget::onCoordinatesUpdated);
     }
 
     return true;
@@ -57,6 +60,17 @@ void SidebarWidget::setupUI()
     QVBoxLayout* contentLayout = new QVBoxLayout(m_scrollContent);
     contentLayout->setContentsMargins(8,8,8,8);
     contentLayout->setSpacing(10);
+
+    // --- Coordinates section (inline, replaces standalone panel) ---
+    QGroupBox* coordsGroup = new QGroupBox("Position");
+    QHBoxLayout* coordsLayout = new QHBoxLayout();
+    m_coordXLabel = new QLabel("X: 0.00 m");
+    m_coordYLabel = new QLabel("Y: 0.00 m");
+    coordsLayout->addWidget(m_coordXLabel);
+    coordsLayout->addStretch(1);
+    coordsLayout->addWidget(m_coordYLabel);
+    coordsGroup->setLayout(coordsLayout);
+    contentLayout->addWidget(coordsGroup);
 
     // --- Motion section ---
     QGroupBox* motionGroup = new QGroupBox("Motion");
@@ -237,6 +251,16 @@ void SidebarWidget::setupUI()
             Logger::instance().debug("SidebarWidget test: directly disabling motion controls");
             setMotionEnabled(false);
         });
+        // also exercise coordinate update handling via ROS2 interface signal
+        QTimer::singleShot(6200, this, [this]() {
+            Logger::instance().debug("SidebarWidget test: simulating coords 1.23, 4.56 via ROS2Interface");
+            if (m_ros2Interface) {
+                // emit the signal directly to verify connection wiring
+                m_ros2Interface->coordinatesReceived(1.23, 4.56);
+            } else {
+                onCoordinatesUpdated(1.23, 4.56);
+            }
+        });
         QTimer::singleShot(6500, this, [this]() {
             Logger::instance().debug("SidebarWidget test: directly re-enabling motion controls");
             setMotionEnabled(true);
@@ -338,6 +362,19 @@ void SidebarWidget::sendStop()
     if (m_ros2Interface) {
         m_ros2Interface->publishVelocityCommand(0.0, 0.0, 0.0);
     }
+}
+
+
+void SidebarWidget::onCoordinatesUpdated(double x, double y)
+{
+    // display metres with two decimals
+    if (m_coordXLabel) {
+        m_coordXLabel->setText(QString("X: %1 m").arg(x, 0, 'f', 2));
+    }
+    if (m_coordYLabel) {
+        m_coordYLabel->setText(QString("Y: %1 m").arg(y, 0, 'f', 2));
+    }
+    Logger::instance().debug(QString("SidebarWidget coordinates: X=%1 Y=%2").arg(x).arg(y));
 }
 
 

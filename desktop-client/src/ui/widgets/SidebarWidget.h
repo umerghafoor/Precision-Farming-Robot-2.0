@@ -46,6 +46,9 @@ private slots:
     void onStopClicked();
     void onEmergencyStopClicked();
 
+    // coordinates update slot
+    void onCoordinatesUpdated(double x, double y);
+
 private:
     enum class Motion {
         Forward,
@@ -98,6 +101,10 @@ private:
     QSlider* m_angularSpeedSlider;
     QLabel* m_linearSpeedLabel;
     QLabel* m_angularSpeedLabel;
+
+    // inline coordinates display (replaces standalone CoordinatesWidget)
+    QLabel* m_coordXLabel;
+    QLabel* m_coordYLabel;
 
     // bottom area buttons
     QPushButton* m_stopButton;

@@ -175,7 +175,8 @@ void MainWindow::createDefaultLayout()
     // Build the three-zone layout using the existing dock system.
     // The order of addition determines splitting behaviour.
     onAddVideoStream();      // left main video area
-    onAddCoordinates();      // left, split beside video
+    // coordinates dock is no longer part of default layout – position will be shown inline in sidebar
+    // onAddCoordinates();      // left, split beside video
     // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
     onAddSidebar();          // right sidebar unified control panel
     onAddSensorData();       // bottom telemetry bar
