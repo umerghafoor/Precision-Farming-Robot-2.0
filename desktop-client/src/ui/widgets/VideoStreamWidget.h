@@ -3,8 +3,11 @@
 
 #include "BaseWidget.h"
 #include <QLabel>
-#include <QComboBox>
+#include <QTabBar>
 #include <QPushButton>
+#include <QElapsedTimer>
+#include <QTimer>
+#include <QPropertyAnimation>
 
 /**
  * @brief Widget for displaying video streams from robot cameras
@@ -20,18 +23,34 @@ public:
     bool initialize() override;
     QString displayName() const override { return "Video Stream"; }
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private slots:
     void onImageReceived(const QByteArray& imageData, int width, int height);
-    void onStreamSourceChanged(int index);
+    void onStreamTabChanged(int index);
     void onToggleRecording();
+    void onRobotStatusUpdated(const QString& status);
 
 private:
     void setupUI();
+    void showPlaceholder();
+    void updateOverlayInfo(int width, int height);
 
+    QWidget* m_videoContainer;
     QLabel* m_videoLabel;
-    QComboBox* m_streamSelector;
+    QTabBar* m_tabBar;
+    QLabel* m_topicOverlay;
+    QLabel* m_resolutionOverlay;
+    QLabel* m_statusOverlay;
+    QLabel* m_liveDot;
     QPushButton* m_recordButton;
     bool m_recording;
+    QElapsedTimer m_frameTimer;
+    qint64 m_lastFrameTime;
+    QString m_currentTopic;
+    QTimer* m_liveExpiryTimer;
+    QPropertyAnimation* m_pulseAnimation;
 };
 
 #endif // VIDEOSTREAMWIDGET_H
