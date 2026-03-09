@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QDockWidget>
 #include <QMap>
+#include <QSettings>
 #include <memory>
 
 class WidgetManager;
@@ -51,6 +52,12 @@ private:
     void createStatusBar();
     void addWidgetToDock(BaseWidget* widget, const QString& title);
     void createDefaultLayout();
+
+    // layout persistence helpers
+    bool restoreLayout();
+    void saveLayout();
+
+    bool m_layoutRestored{false};
 
     WidgetManager* m_widgetManager;
     ROS2Interface* m_ros2Interface;

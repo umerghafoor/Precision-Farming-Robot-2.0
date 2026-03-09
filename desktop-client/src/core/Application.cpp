@@ -94,6 +94,10 @@ bool Application::initializeDigitalTwin()
 bool Application::initializeUI()
 {
     try {
+        // name the application for QSettings
+        QCoreApplication::setOrganizationName("WeedX");
+        QCoreApplication::setApplicationName("PrecisionFarmingClient");
+
         // set global application font stack before any widgets are created
         QFont appFont;
         // Qt supports comma-separated families; the system will pick the first available

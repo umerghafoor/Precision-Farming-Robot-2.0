@@ -135,9 +135,19 @@ void MainWindow::setDigitalTwin(DigitalTwin* twin)
 {
     m_digitalTwin = twin;
     
-    // Create default layout after all dependencies are set
+    // Create or restore layout after all dependencies are set
     if (m_widgetManager && m_ros2Interface && m_digitalTwin) {
+        // always create the standard set of docks first so restoreState can act on them
         createDefaultLayout();
+
+        if (!m_layoutRestored) {
+            if (restoreLayout()) {
+                Logger::instance().info("Layout restored from previous session");
+            } else {
+                Logger::instance().info("No saved layout found; using default");
+            }
+            m_layoutRestored = true;
+        }
     }
 }
 
@@ -331,6 +341,35 @@ void MainWindow::onToggleSimulation()
     }
 }
 
+// -----------------------------------------------------------------------------
+// layout persistence helpers
+// -----------------------------------------------------------------------------
+
+bool MainWindow::restoreLayout()
+{
+    QSettings settings;
+    if (settings.contains("windowGeometry") && settings.contains("windowState")) {
+        restoreGeometry(settings.value("windowGeometry").toByteArray());
+        restoreState(settings.value("windowState").toByteArray());
+
+        // after restoring we may need to reapply telemetry height constraint
+        if (m_dockWidgets.contains("Sensor Data")) {
+            QDockWidget* telemetry = m_dockWidgets["Sensor Data"];
+            telemetry->setMinimumHeight(160);
+            telemetry->setMaximumHeight(160);
+        }
+        return true;
+    }
+    return false;
+}
+
+void MainWindow::saveLayout()
+{
+    QSettings settings;
+    settings.setValue("windowGeometry", saveGeometry());
+    settings.setValue("windowState", saveState());
+}
+
 void MainWindow::onAbout()
 {
     QMessageBox::about(this, tr("About"),
@@ -349,5 +388,6 @@ void MainWindow::onAbout()
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     Logger::instance().info("Main window closing");
+    saveLayout();
     event->accept();
 }
