@@ -7,6 +7,7 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QSpacerItem>
+#include <QTimer>
 
 SidebarWidget::SidebarWidget(QWidget *parent)
     : BaseWidget(parent)
@@ -90,11 +91,11 @@ void SidebarWidget::setupUI()
     speedLayout->addWidget(m_speedLabel);
     motionLayout->addLayout(speedLayout);
 
-    // radius slider
+    // radius slider (0.00–3.00 m in 1cm steps)
     QHBoxLayout* radiusLayout = new QHBoxLayout();
     m_radiusSlider = new QSlider(Qt::Horizontal);
-    m_radiusSlider->setRange(1, 500);
-    m_radiusSlider->setValue(100);
+    m_radiusSlider->setRange(0, 300); // centimetres
+    m_radiusSlider->setValue(100); // 1.00 m default
     connect(m_radiusSlider, &QSlider::valueChanged, this, [this](int v){
         m_radius = v / 100.0;
         m_radiusLabel->setText(QString("%1 m").arg(m_radius, 0, 'f', 2));
@@ -184,7 +185,24 @@ void SidebarWidget::setupUI()
     bottomLayout->addWidget(m_emergencyStopButton);
 
     mainLayout->addWidget(bottomBar);
+
+    // automated exercise for sidebar test mode (motion control + sliders)
+    if (qgetenv("SIDEBAR_WIDGET_TEST") == "1") {
+        QTimer::singleShot(500, this, [this]() { m_speedSlider->setValue(80); });
+        QTimer::singleShot(1000, this, [this]() { m_radiusSlider->setValue(200); });
+        QTimer::singleShot(1500, this, [this]() {
+            if (m_buttons.contains(Motion::Forward)) m_buttons[Motion::Forward]->animateClick();
+        });
+        QTimer::singleShot(2000, this, [this]() {
+            if (m_buttons.contains(Motion::BackRight)) m_buttons[Motion::BackRight]->animateClick();
+        });
+        QTimer::singleShot(2500, this, [this]() {
+            if (m_buttons.contains(Motion::SpinLeft)) m_buttons[Motion::SpinLeft]->animateClick();
+        });
+        QTimer::singleShot(3000, this, [this]() { m_stopButton->click(); });
+    }
 }
+
 
 void SidebarWidget::onSpeedChanged(int value)
 {
