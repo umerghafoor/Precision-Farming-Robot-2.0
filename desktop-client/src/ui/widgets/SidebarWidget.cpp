@@ -176,9 +176,11 @@ void SidebarWidget::setupUI()
 
     m_stopButton = new QPushButton("STOP");
     m_stopButton->setObjectName("stopButton");
+    Q_ASSERT(m_stopButton->objectName() == "stopButton");
     connect(m_stopButton, &QPushButton::clicked, this, &SidebarWidget::onStopClicked);
     m_emergencyStopButton = new QPushButton("EMERGENCY STOP");
     m_emergencyStopButton->setObjectName("emergencyStopButton");
+    Q_ASSERT(m_emergencyStopButton->objectName() == "emergencyStopButton");
     connect(m_emergencyStopButton, &QPushButton::clicked, this, &SidebarWidget::onEmergencyStopClicked);
 
     bottomLayout->addWidget(m_stopButton);
@@ -188,6 +190,7 @@ void SidebarWidget::setupUI()
 
     // automated exercise for sidebar test mode (motion control + sliders)
     if (qgetenv("SIDEBAR_WIDGET_TEST") == "1") {
+        // automated sequence to exercise motion controls and stop buttons
         QTimer::singleShot(500, this, [this]() { m_speedSlider->setValue(80); });
         QTimer::singleShot(1000, this, [this]() { m_radiusSlider->setValue(200); });
         QTimer::singleShot(1500, this, [this]() {
@@ -200,6 +203,16 @@ void SidebarWidget::setupUI()
             if (m_buttons.contains(Motion::SpinLeft)) m_buttons[Motion::SpinLeft]->animateClick();
         });
         QTimer::singleShot(3000, this, [this]() { m_stopButton->click(); });
+        // also click emergency stop slightly later to verify its availability and styling
+        QTimer::singleShot(3300, this, [this]() {
+            Logger::instance().debug("SidebarWidget test: clicking emergency stop");
+            m_emergencyStopButton->click();
+        });
+        // log palette colour so we can eyeball that it resolves to red
+        QTimer::singleShot(100, this, [this]() {
+            QPalette pal = m_emergencyStopButton->palette();
+            Logger::instance().debug(QString("Emergency button palette button color: %1").arg(pal.color(QPalette::Button).name()));
+        });
     }
 }
 
