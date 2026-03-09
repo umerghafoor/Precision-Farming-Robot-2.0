@@ -32,6 +32,25 @@ bool ROS2Interface::initialize()
         m_initialized = true;
         Logger::instance().info("ROS2 interface initialized successfully");
 
+        // testing hook: emit a synthetic BGR8 frame to verify conversion
+        if (qgetenv("IMAGE_PIPELINE_TEST") == "1") {
+            sensor_msgs::msg::Image::SharedPtr fake = 
+                std::make_shared<sensor_msgs::msg::Image>();
+            fake->width = 2;
+            fake->height = 2;
+            fake->encoding = "bgr8";
+            fake->step = fake->width * 3;
+            // pixel order: B,G,R for each pixel
+            fake->data = std::vector<uint8_t>{
+                0,0,255,   // red pixel (BGR)
+                0,255,0,   // green pixel
+                255,0,0,   // blue pixel
+                255,255,255 // white pixel
+            };
+            imageCallback(fake);
+            Logger::instance().info("IMAGE_PIPELINE_TEST: synthetic frame injected");
+        }
+
         return true;
     }
     catch (const std::exception& e) {
@@ -219,29 +238,37 @@ void ROS2Interface::publishRobotCommand(const QString& command)
 #ifdef USE_ROS2
 void ROS2Interface::imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
-    // Convert ROS image to QByteArray
-    // Handle both RGB8 and BGR8 encodings
+    // Convert ROS image to QByteArray. We must be explicit about BGR→RGB
+    // because OpenCV publishers use BGR8, whereas QImage expects RGB888.
     QByteArray imageData;
-    
+
     if (msg->encoding == "bgr8") {
-        // Convert BGR to RGB
+        // Perform explicit BGR→RGB conversion on every pixel
         imageData.resize(msg->data.size());
         for (size_t i = 0; i < msg->data.size(); i += 3) {
-            imageData[i] = msg->data[i + 2];     // R
+            imageData[i]     = msg->data[i + 2]; // R
             imageData[i + 1] = msg->data[i + 1]; // G
             imageData[i + 2] = msg->data[i];     // B
         }
-    } else {
-        // Assume RGB8 or compatible format
+        Logger::instance().debug("Converted BGR8 frame to RGB8");
+    } else if (msg->encoding == "rgb8") {
+        // Data already in correct order
         imageData = QByteArray(reinterpret_cast<const char*>(msg->data.data()), 
-                              msg->data.size());
+                               msg->data.size());
+    } else {
+        // Unknown/unsupported encoding: try to treat as RGB and warn operator
+        Logger::instance().warning(QString("Unsupported image encoding '%1'; "
+                                        "treating as RGB8").
+                                    arg(QString::fromStdString(msg->encoding)));
+        imageData = QByteArray(reinterpret_cast<const char*>(msg->data.data()), 
+                               msg->data.size());
     }
-    
+
     emit imageReceived(imageData, msg->width, msg->height);
-    
+
     Logger::instance().debug(QString("Image received: %1x%2, encoding: %3")
-                            .arg(msg->width).arg(msg->height)
-                            .arg(QString::fromStdString(msg->encoding)));
+                             .arg(msg->width).arg(msg->height)
+                             .arg(QString::fromStdString(msg->encoding)));
 }
 
 void ROS2Interface::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)

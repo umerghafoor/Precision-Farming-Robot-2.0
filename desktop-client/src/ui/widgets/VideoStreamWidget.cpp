@@ -124,9 +124,10 @@ bool VideoStreamWidget::initialize()
 
 void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, int height)
 {
-    // BGR8 -> RGB conversion if necessary; most publishers send BGR8
-    // ROS2Interface currently delivers raw bytes; we assume rgb for now,
-    // but log if size matches anyway.
+    // The ROS2Interface ensures any BGR8 frames are converted to RGB8 before
+    // emitting imageReceived. We therefore treat the incoming QByteArray as
+    // RGB data; any unsupported encodings are logged by the interface.
+    // Size mismatches are caught below and reported as warnings.
     int expectedSize = width * height * 3;
     if (imageData.size() != expectedSize) {
         Logger::instance().warning(QString("Image size mismatch: expected %1, got %2")

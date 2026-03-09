@@ -565,11 +565,19 @@ Items for potential future PRDs once the core overhaul is stable:
 
 **Test case (necessary if code touched)**
 - **Name:** Color correctness for BGR8 stream.
-- **Type:** Manual visual validation with known color target.
+- **Type:** Manual visual validation with known color target (or env‑var test).
 - **Steps:**
-  1. Publish a test frame containing known red/green/blue regions.
-  2. View stream in desktop client.
-- **Expected:** Rendered colors match source target; no swapped red/blue channels.
+  1. If a ROS2 environment is available, publish a test frame containing
+     known red/green/blue regions to the currently selected camera topic.
+     Otherwise, start the client with the `IMAGE_PIPELINE_TEST=1` environment
+     variable; a synthetic 2×2 BGR8 frame will be injected during
+     initialization.
+  2. View the stream in the desktop client and/or confirm through logs that
+     the conversion path executed.
+- **Expected:** Rendered colors match the source target; no swapped
+  red/blue channels.  In test‑hook mode the log should report
+  "Converted BGR8 frame to RGB8" and the placeholder frame (if shown) should
+  display the correctly‑converted pixels.
 
 ---
 
