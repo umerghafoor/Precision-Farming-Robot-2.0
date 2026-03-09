@@ -9,8 +9,9 @@
 
 class WidgetManager;
 class ROS2Interface;
-class DigitalTwin;
 class BaseWidget;
+
+#include "twin/DigitalTwin.h"    // needed for DigitalTwin::Mode in slot signature
 
 /**
  * @brief Main application window with dockable widget system
@@ -18,6 +19,8 @@ class BaseWidget;
  * Provides a flexible workspace where users can arrange widgets
  * in a modular fashion
  */
+#include "widgets/StatusBadge.h"
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -45,6 +48,11 @@ private slots:
     void onToggleSimulation();
     void onAbout();
 
+    // status badge updates
+    void onROS2Connected();
+    void onROS2Disconnected();
+    void onSimulationModeChanged(DigitalTwin::Mode mode);
+
 private:
     void setupUI();
     void createMenus();
@@ -69,6 +77,10 @@ private:
     QAction* m_connectAction;
     QAction* m_simulateAction;
     bool m_ros2Connected;
+
+    // persistent badges in title/menu bar
+    StatusBadge *m_ros2Badge;
+    StatusBadge *m_simBadge;
 };
 
 #endif // MAINWINDOW_H

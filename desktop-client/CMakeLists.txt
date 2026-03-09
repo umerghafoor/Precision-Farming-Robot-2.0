@@ -80,6 +80,7 @@ set(SOURCES
     src/ui/widgets/SensorDataWidget.cpp
     src/ui/widgets/CoordinatesWidget.cpp
     src/ui/widgets/TwinVisualizationWidget.cpp
+    src/ui/widgets/StatusBadge.cpp
     src/utils/Logger.cpp
     resources.qrc
 )
@@ -99,6 +100,7 @@ set(HEADERS
     src/ui/widgets/SensorDataWidget.h
     src/ui/widgets/CoordinatesWidget.h
     src/ui/widgets/TwinVisualizationWidget.h
+    src/ui/widgets/StatusBadge.h
     src/utils/Logger.h
 )
 

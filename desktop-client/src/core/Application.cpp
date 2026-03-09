@@ -9,6 +9,7 @@
 #include <QFont>
 #include <QFile>
 #include <QTextStream>
+#include <QTimer>
 
 Application::Application(int argc, char** argv, QObject *parent)
     : QObject(parent)
@@ -153,6 +154,29 @@ void Application::show()
 {
     if (m_mainWindow) {
         m_mainWindow->show();
+    }
+
+    // optional self-test sequence for status badges
+    if (qEnvironmentVariableIsSet("UI_BADGE_TEST")) {
+        Logger::instance().info("UI_BADGE_TEST active: will exercise badges");
+        // connect then disconnect
+        if (m_ros2Interface) {
+            QTimer::singleShot(1000, [this]() {
+                m_ros2Interface->start();
+            });
+            QTimer::singleShot(3000, [this]() {
+                m_ros2Interface->stop();
+            });
+        }
+        // toggle simulation on/off
+        if (m_digitalTwin) {
+            QTimer::singleShot(5000, [this]() {
+                m_digitalTwin->startSimulation();
+            });
+            QTimer::singleShot(7000, [this]() {
+                m_digitalTwin->stopSimulation();
+            });
+        }
     }
 }
 

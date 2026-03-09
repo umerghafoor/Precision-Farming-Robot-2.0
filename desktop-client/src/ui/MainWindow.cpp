@@ -13,6 +13,7 @@
 #include <QCloseEvent>
 #include <QLabel>
 #include <QToolButton>
+#include <QHBoxLayout>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -84,6 +85,17 @@ void MainWindow::createMenus()
     // Help menu
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
     helpMenu->addAction(tr("&About"), this, &MainWindow::onAbout);
+
+    // create persistent badges container
+    QWidget *badgeContainer = new QWidget(this);
+    QHBoxLayout *badgeLayout = new QHBoxLayout(badgeContainer);
+    badgeLayout->setContentsMargins(0,0,0,0);
+    badgeLayout->setSpacing(8);
+    m_ros2Badge = new StatusBadge(tr("ROS2 Offline"), this);
+    m_simBadge  = new StatusBadge(tr("Simulation Off"), this);
+    badgeLayout->addWidget(m_ros2Badge);
+    badgeLayout->addWidget(m_simBadge);
+    menuBar()->setCornerWidget(badgeContainer, Qt::TopRightCorner);
 }
 
 void MainWindow::createToolBar()
@@ -120,14 +132,8 @@ void MainWindow::setROS2Interface(ROS2Interface* ros2)
     m_ros2Interface = ros2;
     
     if (m_ros2Interface) {
-        connect(m_ros2Interface, &ROS2Interface::connected, this, [this]() {
-            statusBar()->showMessage(tr("ROS2 Connected"), 3000);
-            m_ros2Connected = true;
-        });
-        connect(m_ros2Interface, &ROS2Interface::disconnected, this, [this]() {
-            statusBar()->showMessage(tr("ROS2 Disconnected"), 3000);
-            m_ros2Connected = false;
-        });
+        connect(m_ros2Interface, &ROS2Interface::connected, this, &MainWindow::onROS2Connected);
+        connect(m_ros2Interface, &ROS2Interface::disconnected, this, &MainWindow::onROS2Disconnected);
     }
 }
 
@@ -135,6 +141,13 @@ void MainWindow::setDigitalTwin(DigitalTwin* twin)
 {
     m_digitalTwin = twin;
     
+    // connect badge update for simulation mode
+    if (m_digitalTwin) {
+        connect(m_digitalTwin, &DigitalTwin::modeChanged, this, &MainWindow::onSimulationModeChanged);
+        // set initial state
+        onSimulationModeChanged(m_digitalTwin->mode());
+    }
+
     // Create or restore layout after all dependencies are set
     if (m_widgetManager && m_ros2Interface && m_digitalTwin) {
         // always create the standard set of docks first so restoreState can act on them
@@ -368,6 +381,50 @@ void MainWindow::saveLayout()
     QSettings settings;
     settings.setValue("windowGeometry", saveGeometry());
     settings.setValue("windowState", saveState());
+}
+
+
+// -----------------------------------------------------------------------------
+// status badge slot implementations
+// -----------------------------------------------------------------------------
+
+void MainWindow::onROS2Connected()
+{
+    Logger::instance().info("MainWindow: ROS2 connected, updating badge");
+    statusBar()->showMessage(tr("ROS2 Connected"), 3000);
+    m_ros2Connected = true;
+    if (m_ros2Badge) {
+        m_ros2Badge->setText(tr("ROS2 Connected"));
+        m_ros2Badge->setDotColor(QColor("#52C44A")); // live green
+    }
+}
+
+void MainWindow::onROS2Disconnected()
+{
+    Logger::instance().info("MainWindow: ROS2 disconnected, updating badge");
+    statusBar()->showMessage(tr("ROS2 Disconnected"), 3000);
+    m_ros2Connected = false;
+    if (m_ros2Badge) {
+        m_ros2Badge->setText(tr("ROS2 Offline"));
+        m_ros2Badge->setDotColor(QColor("#7A9B79")); // grey
+    }
+}
+
+void MainWindow::onSimulationModeChanged(DigitalTwin::Mode mode)
+{
+    Logger::instance().info(QString("MainWindow: simulation mode changed to %1").arg(static_cast<int>(mode)));
+    if (!m_simBadge) return;
+
+    switch (mode) {
+    case DigitalTwin::Mode::Simulated:
+        m_simBadge->setText(tr("Simulation On"));
+        m_simBadge->setDotColor(QColor("#52C44A"));
+        break;
+    default:
+        m_simBadge->setText(tr("Simulation Off"));
+        m_simBadge->setDotColor(QColor("#7A9B79"));
+        break;
+    }
 }
 
 void MainWindow::onAbout()
