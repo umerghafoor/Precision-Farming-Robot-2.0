@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "MaterialDockWidget.h"
 #include "WidgetManager.h"
 #include "ROS2Interface.h"
 #include "DigitalTwin.h"
@@ -50,8 +51,11 @@ void MainWindow::setupUI()
 
     // Set central widget as empty - we'll use dock widgets
     QWidget* centralWidget = new QWidget(this);
-    centralWidget->setStyleSheet("background-color: #2b2b2b;");
+    centralWidget->setObjectName("mainCentralWidget");
     setCentralWidget(centralWidget);
+
+    // 6px gap between docks exposes the surface background, creating M3 card separation
+    setContentsMargins(6, 6, 6, 6);
 }
 
 void MainWindow::createMenus()
@@ -98,7 +102,15 @@ void MainWindow::createMenus()
     m_simBadge  = new StatusBadge(tr("Simulation Off"), this);
     badgeLayout->addWidget(m_ros2Badge);
     badgeLayout->addWidget(m_simBadge);
+    badgeContainer->setObjectName("appBarBadgeContainer");
     menuBar()->setCornerWidget(badgeContainer, Qt::TopRightCorner);
+
+    // WeedX brand label in left corner — M3 app bar branding
+    QLabel* brandLabel = new QLabel(this);
+    brandLabel->setObjectName("appBarBrandLabel");
+    brandLabel->setText("WeedX  <span style='font-weight:400;color:#7A9B79;'>Precision Farming</span>");
+    brandLabel->setTextFormat(Qt::RichText);
+    menuBar()->setCornerWidget(brandLabel, Qt::TopLeftCorner);
 }
 
 void MainWindow::createToolBar()
@@ -119,6 +131,9 @@ void MainWindow::createToolBar()
         btn->setObjectName("connectButton");
     }
     toolbar->addAction(m_simulateAction);
+    if (auto btn = qobject_cast<QToolButton*>(toolbar->widgetForAction(m_simulateAction))) {
+        btn->setObjectName("simulateButton");
+    }
 }
 
 void MainWindow::createStatusBar()
@@ -192,7 +207,7 @@ void MainWindow::createDefaultLayout()
 
     // Fix telemetry bar height to ~160px so it remains visible and constant
     if (m_dockWidgets.contains("Sensor Data")) {
-        QDockWidget* telemetry = m_dockWidgets["Sensor Data"];
+        MaterialDockWidget* telemetry = m_dockWidgets["Sensor Data"];
         telemetry->setMinimumHeight(160);
         telemetry->setMaximumHeight(160);
         // On some platforms the dock may still float/rescale; restricting both min/max helps
@@ -205,18 +220,18 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
 {
     if (!widget) return;
 
-    QDockWidget* dock = new QDockWidget(title, this);
+    MaterialDockWidget* dock = new MaterialDockWidget(title, this);
     dock->setWidget(widget);
     dock->setObjectName(widget->widgetId());
-    
+
     // Make dockable, movable, and closable
-    dock->setFeatures(QDockWidget::DockWidgetMovable | 
-                      QDockWidget::DockWidgetClosable | 
+    dock->setFeatures(QDockWidget::DockWidgetMovable |
+                      QDockWidget::DockWidgetClosable |
                       QDockWidget::DockWidgetFloatable);
 
     // Determine dock area based on widget type
     Qt::DockWidgetArea area = Qt::RightDockWidgetArea;
-    QDockWidget* splitWith = nullptr;
+    MaterialDockWidget* splitWith = nullptr;
     
     // Smart placement based on widget type
     if (title.contains("Video", Qt::CaseInsensitive)) {
@@ -386,7 +401,7 @@ bool MainWindow::restoreLayout()
 
         // after restoring we may need to reapply telemetry height constraint
         if (m_dockWidgets.contains("Sensor Data")) {
-            QDockWidget* telemetry = m_dockWidgets["Sensor Data"];
+            MaterialDockWidget* telemetry = m_dockWidgets["Sensor Data"];
             telemetry->setMinimumHeight(160);
             telemetry->setMaximumHeight(160);
         }

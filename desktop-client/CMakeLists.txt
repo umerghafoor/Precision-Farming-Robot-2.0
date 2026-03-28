@@ -73,6 +73,7 @@ set(SOURCES
     src/twin/TwinState.cpp
     src/twin/TwinSimulator.cpp
     src/ui/MainWindow.cpp
+    src/ui/MaterialDockWidget.cpp
     src/ui/widgets/BaseWidget.cpp
     src/ui/widgets/VideoStreamWidget.cpp
     src/ui/widgets/CommandControlWidget.cpp
@@ -94,6 +95,7 @@ set(HEADERS
     src/twin/TwinState.h
     src/twin/TwinSimulator.h
     src/ui/MainWindow.h
+    src/ui/MaterialDockWidget.h
     src/ui/widgets/BaseWidget.h
     src/ui/widgets/VideoStreamWidget.h
     src/ui/widgets/CommandControlWidget.h

@@ -1,204 +1,626 @@
-/* WeedX desktop client global theme (task 1 stub)
-   Task 2: full palette tokens and core component styling
+/* ============================================================
+   WeedX Precision Farming — Material You (M3) Theme
+   Seed color: #52C44A (WeedX green)
 
-   Colour tokens derived from PRD section 5.1. Comments include the
-   token name for clarity; Qt style sheets have no variables so we
-   repeat hex codes where necessary.
-*/
+   M3 Color Roles (dark scheme):
+   Primary              #52C44A   on-primary           #0A2908
+   Primary-Container    #1B3A1A   on-primary-container #A8F09E
+   Secondary            #7A9B79   secondary-container  #1E321E
+   Surface              #0F1A0E   surface-variant      #1B2E1A
+   Surface-Container    #161F15   surface-container-hi #223B21
+   On-Surface           #E4F0E3   on-surface-variant   #7A9B79
+   Outline              #2A3D29   outline-variant      #1E2E1D
+   Error                #E05050   warning              #D4882A
+   ============================================================ */
 
-/* ------------------------------------------------------------------
-   Palette tokens
-   ------------------------------------------------------------------
-*/
-/* --bg          */ /* #0D1A0C */
-/* --surface     */ /* #142213 */
-/* --surface-2   */ /* #1B2E1A */
-/* --surface-3   */ /* #223B21 */
-/* --border      */ /* #2A3D29 */
-/* --green       */ /* #3D8B37 */
-/* --green-lit   */ /* #52C44A */
-/* --green-dim   */ /* #2A6126 */
-/* --text        */ /* #E4F0E3 */
-/* --text-dim    */ /* #7A9B79 */
-/* --text-mute   */ /* #4A6B49 */
-/* --red         */ /* #E05050 */
-/* --amber       */ /* #D4882A */
-/* --amber-dim   */ /* #A3621F */
-/* --amber-lit   */ /* #FFA726 */
 
-/* ------------------------------------------------------------------
-   Base surfaces
-   ------------------------------------------------------------------
-*/
+/* ── 1. Base Surfaces ─────────────────────────────────────── */
+
 QWidget {
-    background-color: #0D1A0C;
+    background-color: #0F1A0E;
+    color: #E4F0E3;
+    font-family: "Inter", "Segoe UI", "Ubuntu", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    selection-background-color: #1B3A1A;
+    selection-color: #A8F09E;
+}
+
+QMainWindow {
+    background-color: #0F1A0E;
+}
+
+#mainCentralWidget {
+    background-color: #0F1A0E;
+}
+
+QDialog {
+    background-color: #161F15;
+}
+
+
+/* ── 2. Dock Widgets (M3 Card) ────────────────────────────── */
+
+QDockWidget {
+    titlebar-close-icon: none;
+    titlebar-normal-icon: none;
+}
+
+/* Content area of each dock — surface-container */
+QDockWidget > QWidget {
+    background-color: #161F15;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+}
+
+/* Custom M3 title bar — surface-container-highest */
+QWidget#dockTitleBar {
+    background-color: #223B21;
+    border-bottom: 1px solid #1E2E1D;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    min-height: 40px;
+    max-height: 40px;
+}
+
+/* Drag grip — on-surface-variant, decorative */
+QLabel#dockGripLabel {
+    color: #7A9B79;
+    font-size: 12px;
+    background: transparent;
+    border: none;
+}
+
+/* Title label — Title Small: 14sp / 500 */
+QLabel#dockTitleLabel {
+    color: #E4F0E3;
+    font-size: 14px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+}
+
+/* Float / Close icon buttons — M3 Icon Button */
+QToolButton#dockFloatButton,
+QToolButton#dockCloseButton {
+    background-color: transparent;
+    color: #7A9B79;
+    border: none;
+    border-radius: 20px;
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    font-size: 14px;
+    padding: 0;
+}
+QToolButton#dockFloatButton:hover,
+QToolButton#dockCloseButton:hover {
+    background-color: rgba(228, 240, 227, 0.08);
+    color: #E4F0E3;
+}
+QToolButton#dockFloatButton:pressed,
+QToolButton#dockCloseButton:pressed {
+    background-color: rgba(228, 240, 227, 0.12);
     color: #E4F0E3;
 }
 
-QMainWindow, QDialog, QMenu, QMenuBar, QToolBar {
-    background-color: #0D1A0C;
+
+/* ── 3. Menu Bar — M3 Top App Bar ────────────────────────── */
+
+QMenuBar {
+    background-color: #1B2E1A;
     color: #E4F0E3;
+    border-bottom: 1px solid #1E2E1D;
+    min-height: 48px;
+    padding: 0 8px;
+    font-size: 14px;
+    font-weight: 500;
+}
+QMenuBar::item {
+    background: transparent;
+    color: #E4F0E3;
+    padding: 8px 12px;
+    border-radius: 4px;
+}
+QMenuBar::item:selected {
+    background-color: rgba(228, 240, 227, 0.08);
+}
+QMenuBar::item:pressed {
+    background-color: rgba(228, 240, 227, 0.12);
 }
 
-/* Panel cards and group boxes use "surface" with a border and rounded
-   corners to emulate mobile-style cards. */
-QGroupBox, QFrame.card {
-    background-color: #142213;
-    color: #E4F0E3;
-    border: 1px solid #2A3D29;
-    border-radius: 8px;
-    margin-top: 6px;
-}
-
-QGroupBox::title {
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
-    left: 8px;
-    padding: 0 4px;
-    color: #4A6B49; /* --text-mute */
-    font: 10px "Inter", sans-serif;
+/* WeedX brand label — top-left corner */
+QLabel#appBarBrandLabel {
+    color: #52C44A;
+    font-size: 16px;
     font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    background: transparent;
+    border: none;
+    padding: 0 12px;
 }
 
-/* ------------------------------------------------------------------
-   Buttons (generic + object-specific)
-   ------------------------------------------------------------------
-*/
-QPushButton {
-    background-color: #1B2E1A; /* surface-2 */
+/* Badge container */
+QWidget#appBarBadgeContainer {
+    background: transparent;
+    border: none;
+    padding: 0 8px;
+}
+
+
+/* ── 4. Dropdown Menus ────────────────────────────────────── */
+
+QMenu {
+    background-color: #223B21;
     color: #E4F0E3;
     border: 1px solid #2A3D29;
     border-radius: 4px;
-    padding: 6px 12px;
-    font: 12px "Inter", sans-serif;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    padding: 4px 0;
+    font-size: 14px;
 }
-QPushButton:hover {
-    background-color: #223B21; /* surface-3 */
+QMenu::item {
+    padding: 10px 16px;
 }
-QPushButton:pressed {
-    background-color: #2A3D29;
+QMenu::item:selected {
+    background-color: rgba(82, 196, 74, 0.12);
+    color: #A8F09E;
 }
-QPushButton:disabled {
-    background-color: #0D1A0C;
-    color: #7A9B79;
-    border-color: #4A6B49;
-}
-
-/* control-specific object names */
-#stopButton {
-    border: 2px solid #D4882A; /* amber */
-    background-color: transparent;
-    color: #D4882A;
-}
-#stopButton:hover { background-color: #A3621F; }
-#stopButton:pressed { background-color: #FFA726; }
-
-#emergencyStopButton {
-    background-color: #E05050;
-    color: #FFFFFF;
-    border: 2px solid #E05050;
-}
-#emergencyStopButton:hover { background-color: #C04040; }
-#emergencyStopButton:pressed { background-color: #A03030; }
-
-#connectButton {
-    background-color: #2A6126; /* --green-dim */
-    color: #E4F0E3;
-    border: 2px solid #2A6126;
-}
-#connectButton:hover { background-color: #3D8B37; /* --green */ }
-#connectButton:checked, #connectButton:pressed { background-color: #52C44A; }
-
-/* ------------------------------------------------------------------
-   Sliders
-   ------------------------------------------------------------------
-*/
-QSlider::groove:horizontal {
-    border: 1px solid #2A3D29;
-    height: 8px;
-    background: #142213;
-}
-QSlider::handle:horizontal {
-    background: #3D8B37;
-    border: 1px solid #2A3D29;
-    width: 14px;
-    margin: -4px 0;
-    border-radius: 7px;
+QMenu::separator {
+    height: 1px;
+    background-color: #1E2E1D;
+    margin: 4px 0;
 }
 
-/* ------------------------------------------------------------------
-   Scrollbars
-   ------------------------------------------------------------------
-*/
-QScrollBar:horizontal, QScrollBar:vertical {
-    background: #0D1A0C;
-    width: 12px;
-    height: 12px;
-    margin: 0px;
-}
-QScrollBar::handle:horizontal, QScrollBar::handle:vertical {
-    background: #2A3D29;
-    min-width: 20px;
-    min-height: 20px;
-    border-radius: 6px;
-}
-QScrollBar::add-line, QScrollBar::sub-line {
-    background: none;
-}
 
-/* ------------------------------------------------------------------
-   Status dots (small round indicators)
-   ------------------------------------------------------------------
-*/
-.status-dot {
-    background-color: #E05050;
-    border-radius: 5px;
-    min-width: 10px;
-    min-height: 10px;
-}
-.status-dot.connected { background-color: #52C44A; }
-.status-dot.offline   { background-color: #4A6B49; }
-
-/* ------------------------------------------------------------------
-   Additional UI tweaks
-   ------------------------------------------------------------------
-*/
-QLabel.section-title {
-    color: #4A6B49;
-    font: 10px "Inter", sans-serif;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
+/* ── 5. Toolbar ───────────────────────────────────────────── */
 
 QToolBar {
-    background-color: #142213;
-    border-bottom: 1px solid #2A3D29;
+    background-color: #1B2E1A;
+    border: none;
+    border-bottom: 1px solid #1E2E1D;
+    spacing: 4px;
+    padding: 4px 8px;
+}
+QToolBar::separator {
+    width: 1px;
+    background-color: #2A3D29;
+    margin: 6px 4px;
 }
 
-QMenuBar {
-    background-color: #142213;
+/* Generic toolbar buttons — M3 Text Button */
+QToolBar QToolButton {
+    background-color: transparent;
     color: #E4F0E3;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 14px;
+    font-weight: 500;
+}
+QToolBar QToolButton:hover {
+    background-color: rgba(228, 240, 227, 0.08);
+}
+QToolBar QToolButton:pressed,
+QToolBar QToolButton:checked {
+    background-color: rgba(228, 240, 227, 0.12);
 }
 
-QMenu {
-    background-color: #142213;
-    color: #E4F0E3;
+/* Connect — M3 Filled Tonal Button (primary-container) */
+QToolButton#connectButton {
+    background-color: #1B3A1A;
+    color: #A8F09E;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 80px;
+    min-height: 32px;
+}
+QToolButton#connectButton:hover {
+    background-color: #203F20;
+    color: #A8F09E;
+}
+QToolButton#connectButton:checked {
+    background-color: #52C44A;
+    color: #0A2908;
+}
+QToolButton#connectButton:pressed {
+    background-color: rgba(82, 196, 74, 0.20);
 }
 
-/* tab bar for video source selector etc. */
-QTabBar::tab {
-    background: #1B2E1A;
-    color: #E4F0E3;
-    padding: 6px 12px;
+/* Simulate — M3 Filled Tonal Button (secondary-container) */
+QToolButton#simulateButton {
+    background-color: #1E321E;
+    color: #CDE8CB;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 100px;
+    min-height: 32px;
+}
+QToolButton#simulateButton:hover {
+    background-color: #243824;
+    color: #CDE8CB;
+}
+QToolButton#simulateButton:checked {
+    background-color: #52C44A;
+    color: #0A2908;
+}
+QToolButton#simulateButton:pressed {
+    background-color: rgba(82, 196, 74, 0.20);
+}
+
+
+/* ── 6. Status Bar ────────────────────────────────────────── */
+
+QStatusBar {
+    background-color: #121C11;
+    color: #7A9B79;
+    border-top: 1px solid #1E2E1D;
+    font-size: 12px;
+}
+
+
+/* ── 7. Buttons — M3 Outlined (default) ──────────────────── */
+
+QPushButton {
+    background-color: transparent;
+    color: #52C44A;
     border: 1px solid #2A3D29;
-    border-radius: 4px 4px 0 0;
+    border-radius: 20px;
+    padding: 8px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+    min-height: 40px;
+}
+QPushButton:hover {
+    background-color: rgba(82, 196, 74, 0.08);
+    border-color: #52C44A;
+}
+QPushButton:pressed {
+    background-color: rgba(82, 196, 74, 0.12);
+}
+QPushButton:disabled {
+    color: rgba(228, 240, 227, 0.38);
+    border-color: rgba(228, 240, 227, 0.12);
+    background-color: transparent;
+}
+QPushButton:focus {
+    outline: none;
+    border-color: #52C44A;
+}
+
+/* D-pad / directional buttons inside sidebar — compact variant */
+SidebarWidget QPushButton {
+    border-radius: 8px;
+    padding: 8px;
+    min-width: 40px;
+    min-height: 40px;
+    font-size: 16px;
+}
+
+/* Stop — M3 Outlined with warning color */
+QPushButton#stopButton {
+    color: #D4882A;
+    border: 1.5px solid #D4882A;
+    background-color: transparent;
+    border-radius: 20px;
+}
+QPushButton#stopButton:hover {
+    background-color: rgba(212, 136, 42, 0.08);
+}
+QPushButton#stopButton:pressed {
+    background-color: rgba(212, 136, 42, 0.12);
+}
+
+/* Emergency Stop — M3 Filled Button (error role) */
+QPushButton#emergencyStopButton {
+    background-color: #E05050;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 20px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+QPushButton#emergencyStopButton:hover {
+    background-color: rgba(224, 80, 80, 0.92);
+}
+QPushButton#emergencyStopButton:pressed {
+    background-color: #C03030;
+}
+
+/* Connect (QPushButton variant if used outside toolbar) */
+QPushButton#connectButton {
+    background-color: #1B3A1A;
+    color: #A8F09E;
+    border: none;
+    border-radius: 20px;
+    font-weight: 500;
+}
+QPushButton#connectButton:hover {
+    background-color: #203F20;
+}
+QPushButton#connectButton:checked,
+QPushButton#connectButton:pressed {
+    background-color: #52C44A;
+    color: #0A2908;
+}
+
+
+/* ── 8. Group Boxes — M3 Card Containers ─────────────────── */
+
+QGroupBox {
+    background-color: #161F15;
+    border: 1px solid #1E2E1D;
+    border-radius: 16px;
+    margin-top: 12px;
+    padding: 8px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 16px;
+    top: -1px;
+    padding: 0 6px;
+    color: #7A9B79;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    background-color: #161F15;
+}
+
+
+/* ── 9. Sliders — M3 (4px track / 20px thumb) ────────────── */
+
+QSlider::groove:horizontal {
+    background-color: #223B21;
+    border: none;
+    height: 4px;
+    border-radius: 2px;
+}
+QSlider::groove:horizontal:disabled {
+    background-color: rgba(228, 240, 227, 0.12);
+}
+QSlider::handle:horizontal {
+    background-color: #52C44A;
+    border: none;
+    width: 20px;
+    height: 20px;
+    margin: -8px 0;
+    border-radius: 10px;
+}
+QSlider::handle:horizontal:hover {
+    background-color: #6DD665;
+}
+QSlider::handle:horizontal:pressed {
+    background-color: #3D8B37;
+}
+QSlider::handle:horizontal:disabled {
+    background-color: rgba(228, 240, 227, 0.38);
+}
+QSlider::sub-page:horizontal {
+    background-color: #52C44A;
+    border-radius: 2px;
+}
+QSlider::sub-page:horizontal:disabled {
+    background-color: rgba(228, 240, 227, 0.12);
+}
+
+
+/* ── 10. Scroll Bars ──────────────────────────────────────── */
+
+QScrollBar:vertical {
+    background-color: transparent;
+    width: 8px;
+    margin: 0;
+}
+QScrollBar:horizontal {
+    background-color: transparent;
+    height: 8px;
+    margin: 0;
+}
+QScrollBar::handle:vertical,
+QScrollBar::handle:horizontal {
+    background-color: #2A3D29;
+    border-radius: 4px;
+    min-height: 24px;
+    min-width: 24px;
+}
+QScrollBar::handle:vertical:hover,
+QScrollBar::handle:horizontal:hover {
+    background-color: #3D8B37;
+}
+QScrollBar::add-line,
+QScrollBar::sub-line,
+QScrollBar::add-page,
+QScrollBar::sub-page {
+    background: none;
+    border: none;
+}
+
+QScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
+
+/* ── 11. Tab Bar — M3 Segmented / Tab Row ────────────────── */
+
+QTabBar {
+    background-color: transparent;
+}
+QTabBar::tab {
+    background-color: #1B2E1A;
+    color: #7A9B79;
+    padding: 8px 16px;
+    border: 1px solid #2A3D29;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 60px;
 }
 QTabBar::tab:selected {
-    background: #223B21;
+    background-color: #223B21;
+    color: #52C44A;
+    border-bottom: 2px solid #52C44A;
+}
+QTabBar::tab:hover:!selected {
+    background-color: rgba(228, 240, 227, 0.08);
+    color: #E4F0E3;
+}
+
+
+/* ── 12. Status Badges — M3 Assist Chip ──────────────────── */
+
+QWidget#statusBadge {
+    background-color: #1B2E1A;
+    border: 1px solid #2A3D29;
+    border-radius: 8px;
+    padding: 2px 8px;
+    min-height: 28px;
+}
+QWidget#statusBadge QLabel {
+    color: #E4F0E3;
+    font-size: 11px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+}
+
+
+/* ── 13. Telemetry Cells (SensorDataWidget) ───────────────── */
+
+QFrame#telemetryCell {
+    background-color: #161F15;
+    border: 1px solid #1E2E1D;
+    border-radius: 12px;
+}
+QLabel#cellNameLabel {
+    color: #7A9B79;
+    font-size: 10px;
+    font-weight: 500;
+}
+QLabel#cellValueLabel {
+    color: #52C44A;
+    font-family: "JetBrains Mono", "Courier New", monospace;
+    font-size: 14px;
+    font-weight: 400;
+}
+QLabel#cellUnitLabel {
+    color: #7A9B79;
+    font-size: 10px;
+}
+
+
+/* ── 14. Progress Bars — M3 Linear Indicator ─────────────── */
+
+QProgressBar {
+    background-color: #223B21;
+    border: none;
+    border-radius: 2px;
+    max-height: 4px;
+    min-height: 4px;
+    text-align: center;
+}
+QProgressBar::chunk {
+    background-color: #52C44A;
+    border-radius: 2px;
+}
+
+
+/* ── 15. Radio / Check Buttons ───────────────────────────── */
+
+QRadioButton {
+    color: #E4F0E3;
+    font-size: 13px;
+    spacing: 8px;
+}
+QRadioButton::indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    border: 2px solid #2A3D29;
+    background-color: transparent;
+}
+QRadioButton::indicator:checked {
+    border-color: #52C44A;
+    background-color: #52C44A;
+}
+QRadioButton::indicator:hover {
+    border-color: #52C44A;
+}
+
+QCheckBox {
+    color: #E4F0E3;
+    font-size: 13px;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 2px;
+    border: 2px solid #2A3D29;
+    background-color: transparent;
+}
+QCheckBox::indicator:checked {
+    border-color: #52C44A;
+    background-color: #52C44A;
+}
+
+
+/* ── 16. Text Inputs ──────────────────────────────────────── */
+
+QLineEdit,
+QTextEdit,
+QPlainTextEdit {
+    background-color: transparent;
+    color: #E4F0E3;
+    border: none;
+    border-bottom: 1px solid #2A3D29;
+    border-radius: 4px 4px 0 0;
+    padding: 8px 12px;
+    font-size: 14px;
+    selection-background-color: #1B3A1A;
+    selection-color: #A8F09E;
+}
+QLineEdit:focus,
+QTextEdit:focus,
+QPlainTextEdit:focus {
+    border-bottom-color: #52C44A;
+}
+
+
+/* ── 17. Misc ─────────────────────────────────────────────── */
+
+QFrame {
+    background: transparent;
+    border: none;
+}
+
+QMessageBox {
+    background-color: #161F15;
+}
+QMessageBox QLabel {
+    color: #E4F0E3;
+    font-size: 14px;
+}
+QMessageBox QPushButton {
+    min-width: 80px;
+}
+
+QToolTip {
+    background-color: #223B21;
+    color: #E4F0E3;
+    border: 1px solid #2A3D29;
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 4px 8px;
 }
 
 /* end of theme.qss */

@@ -13,16 +13,12 @@ StatusBadge::StatusBadge(const QString &text, QWidget *parent)
     m_dot->setStyleSheet("border-radius:4px; background-color: #7A9B79;"); // default grey
 
     m_label->setText(text);
-    m_label->setStyleSheet("color: #E4F0E3; font-size:10px;");
 
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(4, 2, 4, 2);
     layout->setSpacing(4);
     layout->addWidget(m_dot);
     layout->addWidget(m_label);
-
-    // keep the widget's background transparent so menu bar inherits
-    setAttribute(Qt::WA_TranslucentBackground);
 }
 
 void StatusBadge::setText(const QString &text)

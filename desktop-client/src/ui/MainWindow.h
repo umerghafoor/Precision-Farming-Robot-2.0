@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QSettings>
 #include <memory>
+#include "MaterialDockWidget.h"
 
 class WidgetManager;
 class ROS2Interface;
@@ -72,7 +73,7 @@ private:
     ROS2Interface* m_ros2Interface;
     DigitalTwin* m_digitalTwin;
 
-    QMap<QString, QDockWidget*> m_dockWidgets;
+    QMap<QString, MaterialDockWidget*> m_dockWidgets;
 
     // UI elements
     QAction* m_connectAction;
