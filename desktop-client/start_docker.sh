@@ -27,12 +27,13 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 # Keep this fixed so all ROS2 devices join the same communication domain.
 ROS_DOMAIN_ID=0
 HOST_CYCLONEDDS_CONFIG="${CYCLONEDDS_CONFIG_PATH:-$HOME/.ros/dds_config.xml}"
-LAPTOP_IP="${LAPTOP_IP:-192.168.1.50}"
-PI_IP="${PI_IP:-192.168.1.101}"
+LAPTOP_IP="${LAPTOP_IP:-192.168.0.113}"
+PI_IP="${PI_IP:-192.168.0.112}"
 
 mkdir -p "$(dirname "$HOST_CYCLONEDDS_CONFIG")"
 cat > "$HOST_CYCLONEDDS_CONFIG" <<EOF
 <?xml version="1.0"?>
+<
 <dds>
   <Domain id="${ROS_DOMAIN_ID}">
     <General>
