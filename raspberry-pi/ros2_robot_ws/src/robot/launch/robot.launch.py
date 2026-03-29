@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
 Launch file for the 4-wheel differential robot
-Starts all necessary nodes: motor driver, IMU, encoders, and robot controller
+Starts all necessary nodes: motor driver, IMU, camera, encoders, and controller
 """
 
 from launch import LaunchDescription
-from launch_ros.actions import Node
 from launch.actions import LogInfo
+from launch_ros.actions import Node
+
 
 def generate_launch_description():
     return LaunchDescription([
         LogInfo(msg="Starting 4-Wheel Differential Robot..."),
-        
-        # Motor Driver Node
+
         Node(
             package='motor_control',
             executable='motor_driver',
@@ -25,8 +25,7 @@ def generate_launch_description():
             ],
             emulate_tty=True,
         ),
-        
-        # IMU Sensor Node
+
         Node(
             package='imu_sensor',
             executable='imu_node',
@@ -40,7 +39,6 @@ def generate_launch_description():
             emulate_tty=True,
         ),
 
-        # Camera Sensor Node
         Node(
             package='camera_sensor',
             executable='camera_node',
@@ -56,8 +54,7 @@ def generate_launch_description():
             ],
             emulate_tty=True,
         ),
-        
-        # Encoder Odometry Node
+
         Node(
             package='encoder_odometry',
             executable='encoder_node',
@@ -71,8 +68,7 @@ def generate_launch_description():
             ],
             emulate_tty=True,
         ),
-        
-        # Robot Controller Node
+
         Node(
             package='robot_controller',
             executable='robot_controller',
@@ -87,9 +83,6 @@ def generate_launch_description():
             ],
             emulate_tty=True,
         ),
-        
+
         LogInfo(msg="All nodes started successfully!"),
     ])
-
-if __name__ == '__main__':
-    ld = generate_launch_description()

@@ -41,6 +41,14 @@ imu_sensor:
   gyro_scale_y: 1.0
   gyro_scale_z: 1.0
 
+# Camera Sensor Parameters
+camera_sensor:
+  video_device: "/dev/video0"  # Camera device path on Raspberry Pi
+  image_width: 640             # Image width in pixels
+  image_height: 480            # Image height in pixels
+  publish_rate: 30.0           # Frame publish rate (Hz)
+  frame_id: "camera_link"      # TF frame ID for camera messages
+
 # Encoder & Odometry Parameters
 encoder_odometry:
   # Physical parameters
@@ -111,6 +119,7 @@ topics:
   cmd_vel: "/cmd_vel"                 # Input: velocity commands
   cmd_vel_filtered: "/cmd_vel_filtered" # Output: filtered commands
   imu_data: "/imu/data"               # Output: IMU sensor data
+  camera_raw: "/camera/raw"           # Output: camera images
   odometry: "/odom"                   # Output: odometry data
   robot_status: "/robot_status"       # Output: robot status
 

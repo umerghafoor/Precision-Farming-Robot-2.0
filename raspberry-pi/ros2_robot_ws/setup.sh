@@ -40,13 +40,14 @@ if [ "$INSTALL_DEPS" = true ]; then
   echo ""
   echo "Installing ROS2 dependencies..."
   
-  if command -v apt &> /dev/null; then
-    # Check if ROS2 is installed
-    if [ ! -d "/opt/ros" ]; then
-      echo "ROS2 not found. Please install ROS2 Jazzy first."
-      echo "Visit: https://docs.ros.org/en/jazzy/Installation.html"
-      exit 1
-    fi
+    if command -v apt &> /dev/null; then
+      # Check if ROS2 is installed in conda or system paths.
+      if ! command -v ros2 &> /dev/null && [ ! -d "/opt/ros" ]; then
+        echo "ROS2 not found in the active environment."
+        echo "Activate your conda environment or install ROS2:"
+        echo "  https://docs.ros.org/en/humble/Installation.html"
+        exit 1
+      fi
     
     # Install system dependencies
     sudo apt-get update
@@ -69,13 +70,26 @@ if [ "$INSTALL_DEPS" = true ]; then
   fi
 fi
 
-# Source ROS2 setup
-if [ -f "/opt/ros/jazzy/setup.sh" ]; then
-  source /opt/ros/jazzy/setup.sh
-  echo "ROS2 Jazzy sourced"
+# Source ROS2 setup.
+# Priority:
+# 1) Active environment (e.g., conda) if ros2 is already on PATH
+# 2) /opt/ros/<distro>/setup.sh fallback
+ROS_DISTRO_NAME="${ROS_DISTRO:-humble}"
+ROS_SETUP_PATH="/opt/ros/${ROS_DISTRO_NAME}/setup.sh"
+
+if command -v ros2 &> /dev/null; then
+  ROS2_BIN_PATH="$(command -v ros2)"
+  echo "Using ROS2 from current environment: ${ROS2_BIN_PATH}"
+  if [ -n "${CONDA_PREFIX:-}" ]; then
+    echo "Conda environment detected: ${CONDA_PREFIX}"
+  fi
+elif [ -f "$ROS_SETUP_PATH" ]; then
+  source "$ROS_SETUP_PATH"
+  echo "ROS2 ${ROS_DISTRO_NAME} sourced from ${ROS_SETUP_PATH}"
 else
-  echo "ERROR: ROS2 Jazzy not found at /opt/ros/jazzy/"
-  echo "Please install ROS2 Jazzy first."
+  echo "ERROR: ROS2 not found in PATH and ${ROS_SETUP_PATH} does not exist."
+  echo "If using conda, activate your environment first."
+  echo "Otherwise set ROS_DISTRO to your installed distro under /opt/ros."
   exit 1
 fi
 
