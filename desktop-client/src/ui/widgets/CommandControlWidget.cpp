@@ -59,12 +59,12 @@ void CommandControlWidget::setupUI()
     QVBoxLayout* controlLayout = new QVBoxLayout();
 
     m_stopButton = new QPushButton("STOP");
-    m_stopButton->setStyleSheet("QPushButton { background-color: orange; color: white; font-weight: bold; padding: 10px; }");
+    m_stopButton->setObjectName("stopButton");
     connect(m_stopButton, &QPushButton::clicked,
             this, &CommandControlWidget::onStopClicked);
 
     m_emergencyStopButton = new QPushButton("EMERGENCY STOP");
-    m_emergencyStopButton->setStyleSheet("QPushButton { background-color: red; color: white; font-weight: bold; padding: 10px; }");
+    m_emergencyStopButton->setObjectName("emergencyStopButton");
     connect(m_emergencyStopButton, &QPushButton::clicked,
             this, &CommandControlWidget::onEmergencyStopClicked);
 

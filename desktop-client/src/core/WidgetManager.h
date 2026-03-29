@@ -21,8 +21,11 @@ class WidgetManager : public QObject
 public:
     enum class WidgetType {
         VideoStream,
+        // NOTE: MotionControl and CommandControl remain in the enum for
+        // backwards compatibility but are no longer registered by default.
         MotionControl,
         CommandControl,
+        Sidebar,            // unified motion+command control panel
         SensorData,
         Coordinates,
         TwinVisualization,

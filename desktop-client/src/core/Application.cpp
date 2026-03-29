@@ -5,6 +5,12 @@
 #include "DigitalTwin.h"
 #include "Logger.h"
 
+#include <QApplication>
+#include <QFont>
+#include <QFile>
+#include <QTextStream>
+#include <QTimer>
+
 Application::Application(int argc, char** argv, QObject *parent)
     : QObject(parent)
     , m_argc(argc)
@@ -84,9 +90,31 @@ bool Application::initializeDigitalTwin()
     }
 }
 
+#include <QApplication>
+
 bool Application::initializeUI()
 {
     try {
+        // name the application for QSettings
+        QCoreApplication::setOrganizationName("WeedX");
+        QCoreApplication::setApplicationName("PrecisionFarmingClient");
+
+        // set global application font stack before any widgets are created
+        QFont appFont;
+        // Qt supports comma-separated families; the system will pick the first available
+        appFont.setFamily("Inter,Segoe UI,Ubuntu,sans-serif");
+        qApp->setFont(appFont);
+
+        // apply global stylesheet from resources; theme.qss should be added to the .qrc
+        QFile f(":/theme.qss");
+        if (f.open(QFile::ReadOnly | QFile::Text)) {
+            QTextStream ts(&f);
+            qApp->setStyleSheet(ts.readAll());
+            Logger::instance().info("Global theme stylesheet applied");
+        } else {
+            Logger::instance().warning("Unable to open theme.qss resource");
+        }
+
         // Create widget manager
         m_widgetManager = std::make_unique<WidgetManager>();
 
@@ -126,6 +154,29 @@ void Application::show()
 {
     if (m_mainWindow) {
         m_mainWindow->show();
+    }
+
+    // optional self-test sequence for status badges
+    if (qEnvironmentVariableIsSet("UI_BADGE_TEST")) {
+        Logger::instance().info("UI_BADGE_TEST active: will exercise badges");
+        // connect then disconnect
+        if (m_ros2Interface) {
+            QTimer::singleShot(1000, [this]() {
+                m_ros2Interface->start();
+            });
+            QTimer::singleShot(3000, [this]() {
+                m_ros2Interface->stop();
+            });
+        }
+        // toggle simulation on/off
+        if (m_digitalTwin) {
+            QTimer::singleShot(5000, [this]() {
+                m_digitalTwin->startSimulation();
+            });
+            QTimer::singleShot(7000, [this]() {
+                m_digitalTwin->stopSimulation();
+            });
+        }
     }
 }
 

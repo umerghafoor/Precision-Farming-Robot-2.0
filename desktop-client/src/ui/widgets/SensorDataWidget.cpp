@@ -2,7 +2,9 @@
 #include "ROS2Interface.h"
 #include "Logger.h"
 #include <QVBoxLayout>
-#include <QHeaderView>
+#include <QHBoxLayout>
+#include <QGridLayout>
+#include <QTimer>
 
 SensorDataWidget::SensorDataWidget(QWidget *parent)
     : BaseWidget(parent)
@@ -16,43 +18,97 @@ SensorDataWidget::~SensorDataWidget()
 {
 }
 
+static SensorDataWidget::TelemetryCell makeCell(const QString &name,
+                                                const QString &unit,
+                                                double minVal,
+                                                double maxVal,
+                                                QWidget *parent)
+{
+    SensorDataWidget::TelemetryCell c;
+    c.frame = new QFrame(parent);
+    c.frame->setFrameShape(QFrame::StyledPanel);
+    c.frame->setObjectName("telemetryCell");
+    c.frame->setMinimumWidth(110);
+    QVBoxLayout *lay = new QVBoxLayout(c.frame);
+    lay->setContentsMargins(14, 14, 14, 14);
+    lay->setSpacing(4);
+
+    lay->addStretch(1);
+
+    c.nameLabel = new QLabel(name.toUpper(), c.frame);
+    c.nameLabel->setObjectName("cellNameLabel");
+    c.nameLabel->setAlignment(Qt::AlignCenter);
+    c.nameLabel->setWordWrap(true);
+    lay->addWidget(c.nameLabel);
+
+    c.valueLabel = new QLabel("--", c.frame);
+    c.valueLabel->setObjectName("cellValueLabel");
+    c.valueLabel->setAlignment(Qt::AlignCenter);
+    lay->addWidget(c.valueLabel);
+
+    c.unitLabel = new QLabel(unit, c.frame);
+    c.unitLabel->setObjectName("cellUnitLabel");
+    c.unitLabel->setAlignment(Qt::AlignCenter);
+    lay->addWidget(c.unitLabel);
+
+    lay->addSpacing(8);
+
+    c.miniBar = new QProgressBar(c.frame);
+    c.miniBar->setTextVisible(false);
+    c.miniBar->setFixedHeight(4);
+    c.miniBar->setRange(0, 100);
+    c.miniBar->setValue(0);
+    lay->addWidget(c.miniBar);
+
+    lay->addStretch(1);
+
+    c.minValue = minVal;
+    c.maxValue = maxVal;
+    return c;
+}
+
 void SensorDataWidget::setupUI()
 {
-    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    // 2-row × 3-column grid
+    QGridLayout* mainLayout = new QGridLayout(this);
+    mainLayout->setContentsMargins(12, 12, 12, 12);
+    mainLayout->setSpacing(10);
 
-    m_sensorTable = new QTableWidget();
-    m_sensorTable->setColumnCount(2);
-    m_sensorTable->setHorizontalHeaderLabels({"Sensor", "Value"});
-    m_sensorTable->horizontalHeader()->setStretchLastSection(true);
-    m_sensorTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_sensorTable->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    // create cells in specification order
+    m_cells.append(makeCell("Accel X", "m/s²", -10.0, 10.0, this));
+    m_cells.append(makeCell("Accel Y", "m/s²", -10.0, 10.0, this));
+    m_cells.append(makeCell("Accel Z", "m/s²", -10.0, 10.0, this));
+    m_cells.append(makeCell("Gyro X", "rad/s", -5.0, 5.0, this));
+    m_cells.append(makeCell("Gyro Y", "rad/s", -5.0, 5.0, this));
+    // Robot status cell has no mini-bar
+    SensorDataWidget::TelemetryCell statusCell = makeCell("Robot Status", "", 0.0, 1.0, this);
+    statusCell.miniBar->hide();
+    m_cells.append(statusCell);
 
-    // Initialize sensor rows
-    QStringList sensors = {
-        "Robot Status",
-        "Accelerometer X",
-        "Accelerometer Y",
-        "Accelerometer Z",
-        "Gyroscope X",
-        "Gyroscope Y",
-        "Gyroscope Z",
-        "Battery Level",
-        "GPS Latitude",
-        "GPS Longitude"
-    };
-
-    m_sensorTable->setRowCount(sensors.size());
-    for (int i = 0; i < sensors.size(); ++i) {
-        m_sensorTable->setItem(i, 0, new QTableWidgetItem(sensors[i]));
-        m_sensorTable->setItem(i, 1, new QTableWidgetItem("--"));
+    // Row 0: Accel X, Accel Y, Accel Z
+    // Row 1: Gyro X,  Gyro Y,  Robot Status
+    for (int i = 0; i < m_cells.size(); ++i) {
+        mainLayout->addWidget(m_cells[i].frame, i / 3, i % 3);
+        mainLayout->setColumnStretch(i % 3, 1);
     }
+    mainLayout->setRowStretch(0, 1);
+    mainLayout->setRowStretch(1, 1);
 
-    mainLayout->addWidget(m_sensorTable);
-
-    // Update timer
     m_updateTimer = new QTimer(this);
     connect(m_updateTimer, &QTimer::timeout, this, &SensorDataWidget::updateDisplay);
-    m_updateTimer->start(100); // 10 Hz update rate
+    m_updateTimer->start(100);
+
+    // automated exercise for telemetry bar test mode
+    if (qgetenv("TELEMETRY_WIDGET_TEST") == "1") {
+        QTimer::singleShot(500, this, [this]() {
+            onIMUDataReceived(1.2, -3.4, 5.6, 0.5, -0.5, 0.0);
+            onRobotStatusReceived("Online");
+        });
+        QTimer::singleShot(1500, this, [this]() {
+            onIMUDataReceived(-9.8, 0.0, 2.2, -1.0, 1.1, 0.0);
+            onRobotStatusReceived("Busy");
+        });
+    }
 }
 
 bool SensorDataWidget::initialize()
@@ -87,21 +143,39 @@ void SensorDataWidget::onRobotStatusReceived(const QString& status)
 
 void SensorDataWidget::updateDisplay()
 {
-    updateSensorRow("Robot Status", m_robotStatus);
-    updateSensorRow("Accelerometer X", QString::number(m_imuData.ax, 'f', 3) + " m/s²");
-    updateSensorRow("Accelerometer Y", QString::number(m_imuData.ay, 'f', 3) + " m/s²");
-    updateSensorRow("Accelerometer Z", QString::number(m_imuData.az, 'f', 3) + " m/s²");
-    updateSensorRow("Gyroscope X", QString::number(m_imuData.gx, 'f', 3) + " rad/s");
-    updateSensorRow("Gyroscope Y", QString::number(m_imuData.gy, 'f', 3) + " rad/s");
-    updateSensorRow("Gyroscope Z", QString::number(m_imuData.gz, 'f', 3) + " rad/s");
-}
+    if (m_cells.size() < 6) return;
 
-void SensorDataWidget::updateSensorRow(const QString& sensor, const QString& value)
-{
-    for (int i = 0; i < m_sensorTable->rowCount(); ++i) {
-        if (m_sensorTable->item(i, 0)->text() == sensor) {
-            m_sensorTable->item(i, 1)->setText(value);
-            break;
-        }
+    // Accel X/Y/Z
+    m_cells[0].valueLabel->setText(QString::number(m_imuData.ax, 'f', 3));
+    m_cells[1].valueLabel->setText(QString::number(m_imuData.ay, 'f', 3));
+    m_cells[2].valueLabel->setText(QString::number(m_imuData.az, 'f', 3));
+    // Gyro X/Y
+    m_cells[3].valueLabel->setText(QString::number(m_imuData.gx, 'f', 3));
+    m_cells[4].valueLabel->setText(QString::number(m_imuData.gy, 'f', 3));
+    // Robot status
+    m_cells[5].valueLabel->setText(m_robotStatus);
+
+    // update mini-bars (map value to 0..100)
+    auto scale = [](double val, double minv, double maxv) -> int {
+        if (val <= minv) return 0;
+        if (val >= maxv) return 100;
+        return int((val - minv)/(maxv - minv)*100.0);
+    };
+
+    m_cells[0].miniBar->setValue(scale(m_imuData.ax, m_cells[0].minValue, m_cells[0].maxValue));
+    m_cells[1].miniBar->setValue(scale(m_imuData.ay, m_cells[1].minValue, m_cells[1].maxValue));
+    m_cells[2].miniBar->setValue(scale(m_imuData.az, m_cells[2].minValue, m_cells[2].maxValue));
+    m_cells[3].miniBar->setValue(scale(m_imuData.gx, m_cells[3].minValue, m_cells[3].maxValue));
+    m_cells[4].miniBar->setValue(scale(m_imuData.gy, m_cells[4].minValue, m_cells[4].maxValue));
+    // status cell has no bar
+
+    if (qgetenv("TELEMETRY_WIDGET_TEST") == "1") {
+        Logger::instance().debug(QString("Telemetry updated ax=%1 ay=%2 az=%3 gx=%4 gy=%5 status=%6")
+                                 .arg(m_imuData.ax)
+                                 .arg(m_imuData.ay)
+                                 .arg(m_imuData.az)
+                                 .arg(m_imuData.gx)
+                                 .arg(m_imuData.gy)
+                                 .arg(m_robotStatus));
     }
 }

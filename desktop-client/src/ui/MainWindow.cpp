@@ -1,9 +1,11 @@
 #include "MainWindow.h"
+#include "MaterialDockWidget.h"
 #include "WidgetManager.h"
 #include "ROS2Interface.h"
 #include "DigitalTwin.h"
 #include "BaseWidget.h"
 #include "Logger.h"
+#include "SidebarWidget.h"
 
 #include <QMenuBar>
 #include <QToolBar>
@@ -12,6 +14,8 @@
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QLabel>
+#include <QToolButton>
+#include <QHBoxLayout>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -47,8 +51,11 @@ void MainWindow::setupUI()
 
     // Set central widget as empty - we'll use dock widgets
     QWidget* centralWidget = new QWidget(this);
-    centralWidget->setStyleSheet("background-color: #2b2b2b;");
+    centralWidget->setObjectName("mainCentralWidget");
     setCentralWidget(centralWidget);
+
+    // 2px gap between docks
+    setContentsMargins(2, 2, 2, 2);
 }
 
 void MainWindow::createMenus()
@@ -62,8 +69,10 @@ void MainWindow::createMenus()
     // Widgets menu
     QMenu* widgetsMenu = menuBar()->addMenu(tr("&Widgets"));
     widgetsMenu->addAction(tr("Add &Video Stream"), this, &MainWindow::onAddVideoStream);
-    widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
-    widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
+    widgetsMenu->addAction(tr("Add &Controls"), this, &MainWindow::onAddSidebar);
+    // legacy entries kept for compatibility but hidden from default UI
+    // widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
+    // widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
     widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
     // widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization); // Disabled: Digital Twin widget hidden
@@ -83,6 +92,25 @@ void MainWindow::createMenus()
     // Help menu
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
     helpMenu->addAction(tr("&About"), this, &MainWindow::onAbout);
+
+    // create persistent badges container
+    QWidget *badgeContainer = new QWidget(this);
+    QHBoxLayout *badgeLayout = new QHBoxLayout(badgeContainer);
+    badgeLayout->setContentsMargins(0,0,0,0);
+    badgeLayout->setSpacing(8);
+    m_ros2Badge = new StatusBadge(tr("ROS2 Offline"), this);
+    m_simBadge  = new StatusBadge(tr("Simulation Off"), this);
+    badgeLayout->addWidget(m_ros2Badge);
+    badgeLayout->addWidget(m_simBadge);
+    badgeContainer->setObjectName("appBarBadgeContainer");
+    menuBar()->setCornerWidget(badgeContainer, Qt::TopRightCorner);
+
+    // WeedX brand label in left corner — M3 app bar branding
+    QLabel* brandLabel = new QLabel(this);
+    brandLabel->setObjectName("appBarBrandLabel");
+    brandLabel->setText("WeedX  <span style='font-weight:400;color:#7A9B79;'>Precision Farming</span>");
+    brandLabel->setTextFormat(Qt::RichText);
+    menuBar()->setCornerWidget(brandLabel, Qt::TopLeftCorner);
 }
 
 void MainWindow::createToolBar()
@@ -90,14 +118,16 @@ void MainWindow::createToolBar()
     QToolBar* toolbar = addToolBar(tr("Main Toolbar"));
     toolbar->setMovable(false);
 
-    toolbar->addAction(tr("Video"), this, &MainWindow::onAddVideoStream);
-    toolbar->addAction(tr("Control"), this, &MainWindow::onAddCommandControl);
-    toolbar->addAction(tr("Motion"), this, &MainWindow::onAddMotionControl);
-    //toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
-   // toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
     toolbar->addSeparator();
     toolbar->addAction(m_connectAction);
+    // style hook: name the underlying toolbutton created for the connect action
+    if (auto btn = qobject_cast<QToolButton*>(toolbar->widgetForAction(m_connectAction))) {
+        btn->setObjectName("connectButton");
+    }
     toolbar->addAction(m_simulateAction);
+    if (auto btn = qobject_cast<QToolButton*>(toolbar->widgetForAction(m_simulateAction))) {
+        btn->setObjectName("simulateButton");
+    }
 }
 
 void MainWindow::createStatusBar()
@@ -115,14 +145,8 @@ void MainWindow::setROS2Interface(ROS2Interface* ros2)
     m_ros2Interface = ros2;
     
     if (m_ros2Interface) {
-        connect(m_ros2Interface, &ROS2Interface::connected, this, [this]() {
-            statusBar()->showMessage(tr("ROS2 Connected"), 3000);
-            m_ros2Connected = true;
-        });
-        connect(m_ros2Interface, &ROS2Interface::disconnected, this, [this]() {
-            statusBar()->showMessage(tr("ROS2 Disconnected"), 3000);
-            m_ros2Connected = false;
-        });
+        connect(m_ros2Interface, &ROS2Interface::connected, this, &MainWindow::onROS2Connected);
+        connect(m_ros2Interface, &ROS2Interface::disconnected, this, &MainWindow::onROS2Disconnected);
     }
 }
 
@@ -130,9 +154,26 @@ void MainWindow::setDigitalTwin(DigitalTwin* twin)
 {
     m_digitalTwin = twin;
     
-    // Create default layout after all dependencies are set
+    // connect badge update for simulation mode
+    if (m_digitalTwin) {
+        connect(m_digitalTwin, &DigitalTwin::modeChanged, this, &MainWindow::onSimulationModeChanged);
+        // set initial state
+        onSimulationModeChanged(m_digitalTwin->mode());
+    }
+
+    // Create or restore layout after all dependencies are set
     if (m_widgetManager && m_ros2Interface && m_digitalTwin) {
+        // always create the standard set of docks first so restoreState can act on them
         createDefaultLayout();
+
+        if (!m_layoutRestored) {
+            if (restoreLayout()) {
+                Logger::instance().info("Layout restored from previous session");
+            } else {
+                Logger::instance().info("No saved layout found; using default");
+            }
+            m_layoutRestored = true;
+        }
     }
 }
 
@@ -140,14 +181,33 @@ void MainWindow::createDefaultLayout()
 {
     Logger::instance().info("Creating default widget layout");
     
-    // Create a sensible default layout
-    onAddVideoStream();      // Left side
-    onAddCoordinates();      // Left side, next to video
+    // Build the three-zone layout using the existing dock system.
+    // The order of addition determines splitting behaviour.
+    onAddVideoStream();      // left main video area
+    // coordinates dock is no longer part of default layout – position will be shown inline in sidebar
+    // onAddCoordinates();      // left, split beside video
     // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
-    onAddMotionControl();     // Right side
-    onAddCommandControl();    // Right side (will be tabbed with motion)
-    onAddSensorData();        // Bottom
-    
+    onAddSidebar();          // right sidebar unified control panel
+    onAddSensorData();       // bottom telemetry bar
+
+    // Enforce proportions: video should be ~3× wider than sidebar
+    if (m_dockWidgets.contains("Video Stream") && m_dockWidgets.contains("Controls")) {
+        QList<QDockWidget*> docks;
+        docks << m_dockWidgets["Video Stream"] << m_dockWidgets["Controls"];
+        QList<int> sizes;
+        sizes << 3 << 1; // relative weights
+        resizeDocks(docks, sizes, Qt::Horizontal);
+    }
+
+    // Give Controls ~2/3 of the right column, Sensor Data the remaining ~1/3
+    if (m_dockWidgets.contains("Controls") && m_dockWidgets.contains("Sensor Data")) {
+        QList<QDockWidget*> rightDocks;
+        rightDocks << m_dockWidgets["Controls"] << m_dockWidgets["Sensor Data"];
+        QList<int> sizes;
+        sizes << 2 << 1;
+        resizeDocks(rightDocks, sizes, Qt::Vertical);
+    }
+
     Logger::instance().info("Default layout created");
 }
 
@@ -155,18 +215,18 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
 {
     if (!widget) return;
 
-    QDockWidget* dock = new QDockWidget(title, this);
+    MaterialDockWidget* dock = new MaterialDockWidget(title, this);
     dock->setWidget(widget);
     dock->setObjectName(widget->widgetId());
-    
+
     // Make dockable, movable, and closable
-    dock->setFeatures(QDockWidget::DockWidgetMovable | 
-                      QDockWidget::DockWidgetClosable | 
+    dock->setFeatures(QDockWidget::DockWidgetMovable |
+                      QDockWidget::DockWidgetClosable |
                       QDockWidget::DockWidgetFloatable);
 
     // Determine dock area based on widget type
     Qt::DockWidgetArea area = Qt::RightDockWidgetArea;
-    QDockWidget* splitWith = nullptr;
+    MaterialDockWidget* splitWith = nullptr;
     
     // Smart placement based on widget type
     if (title.contains("Video", Qt::CaseInsensitive)) {
@@ -201,7 +261,14 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
             }
         }
     } else if (title.contains("Sensor", Qt::CaseInsensitive)) {
-        area = Qt::BottomDockWidgetArea;
+        area = Qt::RightDockWidgetArea;
+        // Place below the Controls sidebar
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.key().contains("Controls", Qt::CaseInsensitive)) {
+                splitWith = it.value();
+                break;
+            }
+        }
     }
     
     addDockWidget(area, dock);
@@ -218,37 +285,50 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
     widget->setDigitalTwin(m_digitalTwin);
     widget->initialize();
 
+    // if this is a sidebar control panel, make sure motion gating reflects
+    // current connection state (in case ROS2 was already connected)
+    if (m_ros2Connected) {
+        if (auto sb = qobject_cast<SidebarWidget*>(widget)) {
+            sb->setMotionEnabled(true);
+        }
+    }
+
     Logger::instance().info(QString("Added widget to dock: %1 in area %2").arg(title).arg(area));
+}
+
+
+void MainWindow::onAddCommandControl()
+{
+    Logger::instance().info("CommandControl widget deprecated; using unified sidebar instead");
+    onAddSidebar();
+}
+
+void MainWindow::onAddSidebar()
+{
+    if (!m_widgetManager) return;
+
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::Sidebar, this);
+    addWidgetToDock(widget, "Controls");
+}
+
+void MainWindow::onAddMotionControl()
+{
+    Logger::instance().info("MotionControl widget deprecated; using unified sidebar instead");
+    onAddSidebar();
 }
 
 void MainWindow::onAddVideoStream()
 {
     if (!m_widgetManager) return;
-    
+
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::VideoStream, this);
     addWidgetToDock(widget, "Video Stream");
-}
-
-void MainWindow::onAddCommandControl()
-{
-    if (!m_widgetManager) return;
-    
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::CommandControl, this);
-    addWidgetToDock(widget, "Command & Control");
-}
-
-void MainWindow::onAddMotionControl()
-{
-    if (!m_widgetManager) return;
-
-    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::MotionControl, this);
-    addWidgetToDock(widget, "Motion Control");
 }
 
 void MainWindow::onAddSensorData()
 {
     if (!m_widgetManager) return;
-    
+
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::SensorData, this);
     addWidgetToDock(widget, "Sensor Data");
 }
@@ -256,10 +336,12 @@ void MainWindow::onAddSensorData()
 void MainWindow::onAddCoordinates()
 {
     if (!m_widgetManager) return;
-    
+
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::Coordinates, this);
     addWidgetToDock(widget, "Coordinates");
 }
+
+
 
 void MainWindow::onAddTwinVisualization()
 {
@@ -308,6 +390,81 @@ void MainWindow::onToggleSimulation()
     }
 }
 
+// -----------------------------------------------------------------------------
+// layout persistence helpers
+// -----------------------------------------------------------------------------
+
+bool MainWindow::restoreLayout()
+{
+    QSettings settings;
+    // Version key: bump this when the dock structure changes to force a layout reset
+    const int layoutVersion = 3;
+    if (settings.value("layoutVersion").toInt() != layoutVersion) {
+        settings.remove("windowGeometry");
+        settings.remove("windowState");
+        settings.setValue("layoutVersion", layoutVersion);
+        return false;
+    }
+    if (settings.contains("windowGeometry") && settings.contains("windowState")) {
+        restoreGeometry(settings.value("windowGeometry").toByteArray());
+        restoreState(settings.value("windowState").toByteArray());
+
+        return true;
+    }
+    return false;
+}
+
+void MainWindow::saveLayout()
+{
+    QSettings settings;
+    settings.setValue("windowGeometry", saveGeometry());
+    settings.setValue("windowState", saveState());
+}
+
+
+// -----------------------------------------------------------------------------
+// status badge slot implementations
+// -----------------------------------------------------------------------------
+
+void MainWindow::onROS2Connected()
+{
+    Logger::instance().info("MainWindow: ROS2 connected, updating badge");
+    statusBar()->showMessage(tr("ROS2 Connected"), 3000);
+    m_ros2Connected = true;
+    if (m_ros2Badge) {
+        m_ros2Badge->setText(tr("ROS2 Connected"));
+        m_ros2Badge->setDotColor(QColor("#52C44A")); // live green
+    }
+}
+
+void MainWindow::onROS2Disconnected()
+{
+    Logger::instance().info("MainWindow: ROS2 disconnected, updating badge");
+    statusBar()->showMessage(tr("ROS2 Disconnected"), 3000);
+    m_ros2Connected = false;
+    if (m_ros2Badge) {
+        m_ros2Badge->setText(tr("ROS2 Offline"));
+        m_ros2Badge->setDotColor(QColor("#7A9B79")); // grey
+    }
+}
+
+void MainWindow::onSimulationModeChanged(DigitalTwin::Mode mode)
+{
+    Logger::instance().info(QString("MainWindow: simulation mode changed to %1").arg(static_cast<int>(mode)));
+    if (!m_simBadge) return;
+
+    switch (mode) {
+    case DigitalTwin::Mode::Simulated:
+        m_simBadge->setText(tr("Simulation On"));
+        m_simBadge->setDotColor(QColor("#52C44A"));
+        break;
+    default:
+        m_simBadge->setText(tr("Simulation Off"));
+        m_simBadge->setDotColor(QColor("#7A9B79"));
+        break;
+    }
+}
+
 void MainWindow::onAbout()
 {
     QMessageBox::about(this, tr("About"),
@@ -326,5 +483,6 @@ void MainWindow::onAbout()
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     Logger::instance().info("Main window closing");
+    saveLayout();
     event->accept();
 }

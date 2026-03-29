@@ -110,7 +110,7 @@ void MotionControlWidget::setupUI()
     QHBoxLayout* pinStopLayout = new QHBoxLayout();
     m_pinRadioButton = new QRadioButton("Pin Command");
     m_stopButton = new QPushButton("STOP");
-    m_stopButton->setStyleSheet("QPushButton { background-color: orange; color: white; font-weight: bold; padding: 8px; }");
+    m_stopButton->setObjectName("stopButton");
     connect(m_stopButton, &QPushButton::clicked, this, [this](){
         // Clear pinned motion and send stop
         m_isPinned = false;
