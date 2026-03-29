@@ -23,9 +23,36 @@ fi
 echo "PROJECT_ROOT: $PROJECT_ROOT"
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 
+# ROS2 network settings
+# Keep this fixed so all ROS2 devices join the same communication domain.
+ROS_DOMAIN_ID=0
+HOST_CYCLONEDDS_CONFIG="${CYCLONEDDS_CONFIG_PATH:-$HOME/.ros/dds_config.xml}"
+LAPTOP_IP="${LAPTOP_IP:-192.168.1.50}"
+PI_IP="${PI_IP:-192.168.1.101}"
+
+mkdir -p "$(dirname "$HOST_CYCLONEDDS_CONFIG")"
+cat > "$HOST_CYCLONEDDS_CONFIG" <<EOF
+<?xml version="1.0"?>
+<dds>
+  <Domain id="${ROS_DOMAIN_ID}">
+    <General>
+      <NetworkInterfaceAddress>${LAPTOP_IP}</NetworkInterfaceAddress>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <Peers>
+        <Peer address="${PI_IP}"/>
+      </Peers>
+    </Discovery>
+  </Domain>
+</dds>
+EOF
 
 echo -e "${GREEN}=== Starting Docker Container ===${NC}"
 echo -e "${YELLOW}Workspace: ${SCRIPT_DIR}${NC}"
+echo -e "${YELLOW}ROS_DOMAIN_ID: ${ROS_DOMAIN_ID}${NC}"
+echo -e "${YELLOW}Laptop IP (CycloneDDS interface): ${LAPTOP_IP}${NC}"
+echo -e "${YELLOW}Pi IP (CycloneDDS peer): ${PI_IP}${NC}"
 
 # Check if Docker image exists
 if ! sudo docker images | grep -q "ros2-humble-qt6"; then
@@ -39,14 +66,25 @@ fi
 echo -e "${GREEN}Configuring X11 access...${NC}"
 xhost +local:root > /dev/null 2>&1
 
+DOCKER_ARGS=(
+  -it --rm
+  --network host
+  -e DISPLAY="$DISPLAY"
+  -e ROS_DOMAIN_ID="$ROS_DOMAIN_ID"
+  -v /tmp/.X11-unix:/tmp/.X11-unix
+  -v "$HOME/.Xauthority:/root/.Xauthority"
+  -v "/home/umerghafoor/Github/Precision-Farming-Robot-2.0:/workspace"
+)
+
+echo -e "${GREEN}Using CycloneDDS config: ${HOST_CYCLONEDDS_CONFIG}${NC}"
+DOCKER_ARGS+=(
+  -e CYCLONEDDS_URI=/root/.ros/dds_config.xml
+  -v "$HOST_CYCLONEDDS_CONFIG:/root/.ros/dds_config.xml:ro"
+)
+
 # Run the Docker container
 echo -e "${GREEN}Starting container...${NC}"
-sudo docker run -it --rm \
-  --network host \
-  -e DISPLAY=$DISPLAY \
-  -v /tmp/.X11-unix:/tmp/.X11-unix \
-  -v $HOME/.Xauthority:/root/.Xauthority \
-  -v "/home/umer/Precision-Farming-Robot-2.0/desktop-client":/workspace/desktop-client \
+sudo docker run "${DOCKER_ARGS[@]}" \
   --name precision-farming-client \
   ros2-humble-qt6 \
   bash

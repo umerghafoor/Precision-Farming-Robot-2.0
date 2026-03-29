@@ -24,7 +24,7 @@ fi
 
 # Build the Docker image
 echo -e "${GREEN}Building Docker image for ARM64 platform...${NC}"
-sudo docker build --platform=linux/arm64 -t ros2-humble-qt6:latest .
+sudo docker build -t ros2-humble-qt6:latest .
 
 # Check if build was successful
 if [ $? -eq 0 ]; then
