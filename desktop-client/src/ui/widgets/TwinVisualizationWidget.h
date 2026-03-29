@@ -3,12 +3,13 @@
 
 #include "BaseWidget.h"
 #include <QLabel>
-#include <QTextEdit>
 #include <QPushButton>
 #include <QComboBox>
 
+class RobotMapView;
+
 /**
- * @brief Widget for visualizing the digital twin
+ * @brief Widget for visualizing the digital twin as a 2D overhead map.
  */
 class TwinVisualizationWidget : public BaseWidget
 {
@@ -28,12 +29,13 @@ private slots:
 
 private:
     void setupUI();
-    void updateTwinDisplay();
+    void syncModeCombo();
 
-    QLabel* m_modeLabel;
-    QTextEdit* m_stateDisplay;
-    QComboBox* m_modeSelector;
-    QPushButton* m_resetButton;
+    QLabel*       m_modeLabel;
+    QLabel*       m_coordLabel;
+    QComboBox*    m_modeSelector;
+    QPushButton*  m_resetButton;
+    RobotMapView* m_mapView;
 };
 
 #endif // TWINVISUALIZATIONWIDGET_H

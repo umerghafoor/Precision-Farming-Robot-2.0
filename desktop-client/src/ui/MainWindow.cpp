@@ -75,7 +75,7 @@ void MainWindow::createMenus()
     // widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
     widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
-    // widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization); // Disabled: Digital Twin widget hidden
+    widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
     widgetsMenu->addSeparator();
     widgetsMenu->addAction(tr("&Remove Widget"), this, &MainWindow::onRemoveWidget);
 
@@ -345,9 +345,8 @@ void MainWindow::onAddCoordinates()
 
 void MainWindow::onAddTwinVisualization()
 {
-    // Disabled: Digital Twin widget creation is intentionally turned off
-    Logger::instance().info("Digital Twin widget creation is disabled");
-    return;
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::TwinVisualization, this);
+    addWidgetToDock(widget, "Digital Twin");
 }
 
 void MainWindow::onRemoveWidget()
