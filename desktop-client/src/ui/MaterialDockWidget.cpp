@@ -18,8 +18,8 @@ void MaterialDockWidget::buildTitleBar(const QString& title)
 {
     m_titleBar = new QWidget(this);
     m_titleBar->setObjectName("dockTitleBar");
-    m_titleBar->setMinimumHeight(40);
-    m_titleBar->setMaximumHeight(40);
+    m_titleBar->setMinimumHeight(32);
+    m_titleBar->setMaximumHeight(32);
 
     auto* layout = new QHBoxLayout(m_titleBar);
     layout->setContentsMargins(12, 0, 8, 0);

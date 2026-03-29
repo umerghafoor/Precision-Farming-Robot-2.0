@@ -41,7 +41,7 @@ void VideoStreamWidget::setupUI()
     m_videoContainer = new QFrame();
     m_videoContainer->setStyleSheet("QFrame { background-color: black; }");
     m_videoContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    m_videoContainer->setMinimumSize(640,480);
+    m_videoContainer->setMinimumSize(200, 150);
 
     QVBoxLayout* containerLayout = new QVBoxLayout(m_videoContainer);
     containerLayout->setContentsMargins(0,0,0,0);

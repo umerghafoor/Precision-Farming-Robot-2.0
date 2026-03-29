@@ -3,6 +3,7 @@
 #include "Logger.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QGridLayout>
 #include <QTimer>
 
 SensorDataWidget::SensorDataWidget(QWidget *parent)
@@ -27,28 +28,39 @@ static SensorDataWidget::TelemetryCell makeCell(const QString &name,
     c.frame = new QFrame(parent);
     c.frame->setFrameShape(QFrame::StyledPanel);
     c.frame->setObjectName("telemetryCell");
+    c.frame->setMinimumWidth(110);
     QVBoxLayout *lay = new QVBoxLayout(c.frame);
-    lay->setContentsMargins(6,4,6,4);
-    lay->setAlignment(Qt::AlignCenter);
+    lay->setContentsMargins(14, 14, 14, 14);
+    lay->setSpacing(4);
 
-    c.nameLabel = new QLabel(name, c.frame);
+    lay->addStretch(1);
+
+    c.nameLabel = new QLabel(name.toUpper(), c.frame);
     c.nameLabel->setObjectName("cellNameLabel");
+    c.nameLabel->setAlignment(Qt::AlignCenter);
+    c.nameLabel->setWordWrap(true);
     lay->addWidget(c.nameLabel);
 
     c.valueLabel = new QLabel("--", c.frame);
     c.valueLabel->setObjectName("cellValueLabel");
+    c.valueLabel->setAlignment(Qt::AlignCenter);
     lay->addWidget(c.valueLabel);
 
     c.unitLabel = new QLabel(unit, c.frame);
     c.unitLabel->setObjectName("cellUnitLabel");
+    c.unitLabel->setAlignment(Qt::AlignCenter);
     lay->addWidget(c.unitLabel);
+
+    lay->addSpacing(8);
 
     c.miniBar = new QProgressBar(c.frame);
     c.miniBar->setTextVisible(false);
-    c.miniBar->setMinimumHeight(4);
+    c.miniBar->setFixedHeight(4);
     c.miniBar->setRange(0, 100);
     c.miniBar->setValue(0);
     lay->addWidget(c.miniBar);
+
+    lay->addStretch(1);
 
     c.minValue = minVal;
     c.maxValue = maxVal;
@@ -57,10 +69,10 @@ static SensorDataWidget::TelemetryCell makeCell(const QString &name,
 
 void SensorDataWidget::setupUI()
 {
-    // horizontal bar with six fixed cells
-    QHBoxLayout* mainLayout = new QHBoxLayout(this);
-    mainLayout->setContentsMargins(4,4,4,4);
-    mainLayout->setSpacing(6);
+    // 2-row × 3-column grid
+    QGridLayout* mainLayout = new QGridLayout(this);
+    mainLayout->setContentsMargins(12, 12, 12, 12);
+    mainLayout->setSpacing(10);
 
     // create cells in specification order
     m_cells.append(makeCell("Accel X", "m/s²", -10.0, 10.0, this));
@@ -73,9 +85,14 @@ void SensorDataWidget::setupUI()
     statusCell.miniBar->hide();
     m_cells.append(statusCell);
 
-    for (auto &cell : m_cells) {
-        mainLayout->addWidget(cell.frame, 1);
+    // Row 0: Accel X, Accel Y, Accel Z
+    // Row 1: Gyro X,  Gyro Y,  Robot Status
+    for (int i = 0; i < m_cells.size(); ++i) {
+        mainLayout->addWidget(m_cells[i].frame, i / 3, i % 3);
+        mainLayout->setColumnStretch(i % 3, 1);
     }
+    mainLayout->setRowStretch(0, 1);
+    mainLayout->setRowStretch(1, 1);
 
     m_updateTimer = new QTimer(this);
     connect(m_updateTimer, &QTimer::timeout, this, &SensorDataWidget::updateDisplay);

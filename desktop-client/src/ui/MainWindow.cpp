@@ -54,8 +54,8 @@ void MainWindow::setupUI()
     centralWidget->setObjectName("mainCentralWidget");
     setCentralWidget(centralWidget);
 
-    // 6px gap between docks exposes the surface background, creating M3 card separation
-    setContentsMargins(6, 6, 6, 6);
+    // 2px gap between docks
+    setContentsMargins(2, 2, 2, 2);
 }
 
 void MainWindow::createMenus()
@@ -118,12 +118,6 @@ void MainWindow::createToolBar()
     QToolBar* toolbar = addToolBar(tr("Main Toolbar"));
     toolbar->setMovable(false);
 
-    toolbar->addAction(tr("Video"), this, &MainWindow::onAddVideoStream);
-    toolbar->addAction(tr("Controls"), this, &MainWindow::onAddSidebar);
-    // toolbar->addAction(tr("Control"), this, &MainWindow::onAddCommandControl);
-    // toolbar->addAction(tr("Motion"), this, &MainWindow::onAddMotionControl);
-    //toolbar->addAction(tr("Sensors"), this, &MainWindow::onAddSensorData);
-   // toolbar->addAction(tr("Twin"), this, &MainWindow::onAddTwinVisualization);
     toolbar->addSeparator();
     toolbar->addAction(m_connectAction);
     // style hook: name the underlying toolbutton created for the connect action
@@ -205,12 +199,13 @@ void MainWindow::createDefaultLayout()
         resizeDocks(docks, sizes, Qt::Horizontal);
     }
 
-    // Fix telemetry bar height to ~160px so it remains visible and constant
-    if (m_dockWidgets.contains("Sensor Data")) {
-        MaterialDockWidget* telemetry = m_dockWidgets["Sensor Data"];
-        telemetry->setMinimumHeight(160);
-        telemetry->setMaximumHeight(160);
-        // On some platforms the dock may still float/rescale; restricting both min/max helps
+    // Give Controls ~2/3 of the right column, Sensor Data the remaining ~1/3
+    if (m_dockWidgets.contains("Controls") && m_dockWidgets.contains("Sensor Data")) {
+        QList<QDockWidget*> rightDocks;
+        rightDocks << m_dockWidgets["Controls"] << m_dockWidgets["Sensor Data"];
+        QList<int> sizes;
+        sizes << 2 << 1;
+        resizeDocks(rightDocks, sizes, Qt::Vertical);
     }
 
     Logger::instance().info("Default layout created");
@@ -266,7 +261,14 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
             }
         }
     } else if (title.contains("Sensor", Qt::CaseInsensitive)) {
-        area = Qt::BottomDockWidgetArea;
+        area = Qt::RightDockWidgetArea;
+        // Place below the Controls sidebar
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.key().contains("Controls", Qt::CaseInsensitive)) {
+                splitWith = it.value();
+                break;
+            }
+        }
     }
     
     addDockWidget(area, dock);
@@ -395,16 +397,18 @@ void MainWindow::onToggleSimulation()
 bool MainWindow::restoreLayout()
 {
     QSettings settings;
+    // Version key: bump this when the dock structure changes to force a layout reset
+    const int layoutVersion = 3;
+    if (settings.value("layoutVersion").toInt() != layoutVersion) {
+        settings.remove("windowGeometry");
+        settings.remove("windowState");
+        settings.setValue("layoutVersion", layoutVersion);
+        return false;
+    }
     if (settings.contains("windowGeometry") && settings.contains("windowState")) {
         restoreGeometry(settings.value("windowGeometry").toByteArray());
         restoreState(settings.value("windowState").toByteArray());
 
-        // after restoring we may need to reapply telemetry height constraint
-        if (m_dockWidgets.contains("Sensor Data")) {
-            MaterialDockWidget* telemetry = m_dockWidgets["Sensor Data"];
-            telemetry->setMinimumHeight(160);
-            telemetry->setMaximumHeight(160);
-        }
         return true;
     }
     return false;
