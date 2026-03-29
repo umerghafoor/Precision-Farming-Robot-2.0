@@ -29,6 +29,7 @@ public:
         SensorData,
         Coordinates,
         TwinVisualization,
+        RobotModel3D,
         Custom
     };
 

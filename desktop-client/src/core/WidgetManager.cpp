@@ -7,6 +7,7 @@
 #include "SensorDataWidget.h"
 #include "CoordinatesWidget.h"
 #include "TwinVisualizationWidget.h"
+#include "RobotModelWidget.h"
 #include "Logger.h"
 
 WidgetManager::WidgetManager(QObject *parent)
@@ -23,6 +24,7 @@ WidgetManager::WidgetManager(QObject *parent)
     registerWidget(WidgetType::SensorData, "Sensor Data");
     registerWidget(WidgetType::Coordinates, "Coordinates");
     registerWidget(WidgetType::TwinVisualization, "Digital Twin");
+    registerWidget(WidgetType::RobotModel3D, "Robot 3D Model");
 }
 
 WidgetManager::~WidgetManager()
@@ -69,6 +71,9 @@ BaseWidget* WidgetManager::createWidget(WidgetType type, QWidget* parent)
             break;
         case WidgetType::TwinVisualization:
             widget = new TwinVisualizationWidget(parent);
+            break;
+        case WidgetType::RobotModel3D:
+            widget = new RobotModelWidget(parent);
             break;
         case WidgetType::Custom:
             Logger::instance().warning("Custom widget type not implemented");
@@ -134,6 +139,7 @@ QString WidgetManager::generateWidgetId(WidgetType type)
         case WidgetType::SensorData: typeName = "sensor"; break;
         case WidgetType::Coordinates: typeName = "coordinates"; break;
         case WidgetType::TwinVisualization: typeName = "twin"; break;
+        case WidgetType::RobotModel3D: typeName = "model3d"; break;
         case WidgetType::Custom: typeName = "custom"; break;
     }
     

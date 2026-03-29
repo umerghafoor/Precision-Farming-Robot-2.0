@@ -76,6 +76,7 @@ void MainWindow::createMenus()
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
     widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
     widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
+    widgetsMenu->addAction(tr("Add &Robot 3D Model"), this, &MainWindow::onAddRobotModel);
     widgetsMenu->addSeparator();
     widgetsMenu->addAction(tr("&Remove Widget"), this, &MainWindow::onRemoveWidget);
 
@@ -347,6 +348,12 @@ void MainWindow::onAddTwinVisualization()
 {
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::TwinVisualization, this);
     addWidgetToDock(widget, "Digital Twin");
+}
+
+void MainWindow::onAddRobotModel()
+{
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::RobotModel3D, this);
+    addWidgetToDock(widget, "Robot 3D Model");
 }
 
 void MainWindow::onRemoveWidget()

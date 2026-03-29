@@ -45,6 +45,7 @@ private slots:
     void onAddSensorData();
     void onAddCoordinates();
     void onAddTwinVisualization();
+    void onAddRobotModel();
     void onRemoveWidget();
     void onToggleROS2Connection();
     void onToggleSimulation();

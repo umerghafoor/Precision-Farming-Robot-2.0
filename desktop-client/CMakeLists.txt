@@ -22,6 +22,8 @@ find_package(Qt6 REQUIRED COMPONENTS
 find_package(Qt6 QUIET COMPONENTS
     Multimedia
     MultimediaWidgets
+    OpenGL
+    OpenGLWidgets
 )
 
 if(Qt6Multimedia_FOUND)
@@ -31,6 +33,15 @@ if(Qt6Multimedia_FOUND)
 else()
     message(STATUS "Qt6 Multimedia not found - Building without video support")
     set(HAVE_QT_MULTIMEDIA OFF)
+endif()
+
+if(Qt6OpenGLWidgets_FOUND)
+    message(STATUS "Qt6 OpenGL found - 3D model view enabled")
+    set(HAVE_QT_OPENGL ON)
+    add_definitions(-DHAVE_QT_OPENGL)
+else()
+    message(STATUS "Qt6 OpenGL not found - Building without 3D model view")
+    set(HAVE_QT_OPENGL OFF)
 endif()
 
 # Find ROS2 (optional)
@@ -61,6 +72,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering
 )
 
 # Source files
@@ -84,6 +96,9 @@ set(SOURCES
     src/ui/widgets/TwinVisualizationWidget.cpp
     src/ui/widgets/RobotMapView.cpp
     src/ui/widgets/StatusBadge.cpp
+    src/ui/widgets/RobotModelWidget.cpp
+    src/rendering/OBJLoader.cpp
+    src/rendering/ModelGLView.cpp
     src/utils/Logger.cpp
     resources.qrc
 )
@@ -107,6 +122,10 @@ set(HEADERS
     src/ui/widgets/TwinVisualizationWidget.h
     src/ui/widgets/RobotMapView.h
     src/ui/widgets/StatusBadge.h
+    src/ui/widgets/RobotModelWidget.h
+    src/rendering/OBJMesh.h
+    src/rendering/OBJLoader.h
+    src/rendering/ModelGLView.h
     src/utils/Logger.h
 )
 
@@ -126,6 +145,14 @@ if(HAVE_QT_MULTIMEDIA)
     target_link_libraries(${PROJECT_NAME}
         Qt6::Multimedia
         Qt6::MultimediaWidgets
+    )
+endif()
+
+# Link optional Qt OpenGL (3D model view)
+if(HAVE_QT_OPENGL)
+    target_link_libraries(${PROJECT_NAME}
+        Qt6::OpenGL
+        Qt6::OpenGLWidgets
     )
 endif()
 
