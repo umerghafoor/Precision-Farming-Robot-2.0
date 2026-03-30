@@ -16,6 +16,62 @@ ROS2Interface::~ROS2Interface()
     shutdown();
 }
 
+QString ROS2Interface::normalizeTopicName(const QString& topic) const
+{
+    if (topic.isEmpty()) {
+        return QString();
+    }
+
+    return topic.startsWith('/') ? topic : QString("/") + topic;
+}
+
+#ifdef USE_ROS2
+rclcpp::QoS ROS2Interface::createImageSubscriptionQos() const
+{
+    bool ok = false;
+    int depth = QString::fromLocal8Bit(qgetenv("IMAGE_QOS_DEPTH")).toInt(&ok);
+    if (!ok || depth < 1) {
+        depth = 1;
+    }
+
+    rclcpp::QoS qos(rclcpp::KeepLast(static_cast<size_t>(depth)));
+    if (qgetenv("IMAGE_QOS_RELIABLE") == "1") {
+        qos.reliable();
+    } else {
+        qos.best_effort();
+    }
+    qos.durability_volatile();
+    return qos;
+}
+
+bool ROS2Interface::createImageSubscription(const QString& topic)
+{
+    if (!m_node) {
+        Logger::instance().warning("Cannot create camera subscription - node not initialized");
+        return false;
+    }
+
+    const QString normalizedTopic = normalizeTopicName(topic);
+    if (normalizedTopic.isEmpty()) {
+        Logger::instance().warning("Cannot create camera subscription - empty topic name");
+        return false;
+    }
+
+    m_imageSubscriber = m_node->create_subscription<RawImageMsg>(
+        normalizedTopic.toStdString(),
+        createImageSubscriptionQos(),
+        std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
+
+    Logger::instance().info(QString("Camera subscription active on %1 (reliable=%2, depth=%3)")
+                            .arg(normalizedTopic)
+                            .arg(qgetenv("IMAGE_QOS_RELIABLE") == "1" ? "true" : "false")
+                            .arg(QString::fromLocal8Bit(qgetenv("IMAGE_QOS_DEPTH")).isEmpty()
+                                 ? "1"
+                                 : QString::fromLocal8Bit(qgetenv("IMAGE_QOS_DEPTH"))));
+    return true;
+}
+#endif
+
 bool ROS2Interface::initialize()
 {
 #ifdef USE_ROS2
@@ -34,8 +90,8 @@ bool ROS2Interface::initialize()
 
         // testing hook: emit a synthetic BGR8 frame to verify conversion
         if (qgetenv("IMAGE_PIPELINE_TEST") == "1") {
-            sensor_msgs::msg::Image::SharedPtr fake = 
-                std::make_shared<sensor_msgs::msg::Image>();
+            RawImageMsg::SharedPtr fake = 
+                std::make_shared<RawImageMsg>();
             fake->width = 2;
             fake->height = 2;
             fake->encoding = "bgr8";
@@ -83,10 +139,8 @@ void ROS2Interface::setupPublishers()
 void ROS2Interface::setupSubscribers()
 {
 #ifdef USE_ROS2
-    // Image subscriber - subscribing to camera/raw topic by default
-    m_imageSubscriber = m_node->create_subscription<sensor_msgs::msg::Image>(
-        "camera/raw", 10,
-        std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
+    // Image subscriber - use sensor-stream QoS for high-rate camera frames.
+    createImageSubscription("camera/raw");
 
     // IMU subscriber
     m_imuSubscriber = m_node->create_subscription<sensor_msgs::msg::Imu>(
@@ -126,12 +180,9 @@ void ROS2Interface::switchCameraTopic(const QString& topic)
         Logger::instance().debug("Unsubscribed from previous camera topic");
     }
 
-    // Subscribe to new topic
-    m_imageSubscriber = m_node->create_subscription<sensor_msgs::msg::Image>(
-        topic.toStdString(), 10,
-        std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
-
-    Logger::instance().info(QString("Switched camera subscription to topic: %1").arg(topic));
+    if (!createImageSubscription(topic)) {
+        Logger::instance().warning(QString("Failed to switch camera subscription to topic: %1").arg(topic));
+    }
 #else
     Logger::instance().debug(QString("Camera topic switch (stub): %1").arg(topic));
 #endif
@@ -236,7 +287,7 @@ void ROS2Interface::publishRobotCommand(const QString& command)
 }
 
 #ifdef USE_ROS2
-void ROS2Interface::imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
+void ROS2Interface::imageCallback(const RawImageMsg::SharedPtr msg)
 {
     // Convert ROS image to QByteArray. We must be explicit about BGR→RGB
     // because OpenCV publishers use BGR8, whereas QImage expects RGB888.

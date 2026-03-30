@@ -72,10 +72,16 @@ private:
     void spinROS2();
     void setupPublishers();
     void setupSubscribers();
+    QString normalizeTopicName(const QString& topic) const;
 
 #ifdef USE_ROS2
+    using RawImageMsg = sensor_msgs::msg::Image;
+
+    rclcpp::QoS createImageSubscriptionQos() const;
+    bool createImageSubscription(const QString& topic);
+
     // Callback methods
-    void imageCallback(const sensor_msgs::msg::Image::SharedPtr msg);
+    void imageCallback(const RawImageMsg::SharedPtr msg);
     void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
     void statusCallback(const std_msgs::msg::String::SharedPtr msg);
     void coordinatesCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg);
@@ -89,7 +95,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr m_commandPublisher;
 
     // Subscribers
-    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr m_imageSubscriber;
+    rclcpp::Subscription<RawImageMsg>::SharedPtr m_imageSubscriber;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr m_imuSubscriber;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_statusSubscriber;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr m_coordinatesSubscriber;
