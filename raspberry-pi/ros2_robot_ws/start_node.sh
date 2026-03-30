@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-all}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-ros2}"
 VIDEO_DEVICE="${VIDEO_DEVICE:-/dev/video0}"
+SELECTED_VIDEO_DEVICE=""
 
 PIDS=()
 
@@ -52,6 +53,30 @@ trap cleanup INT TERM EXIT
 
 mkdir -p "$SCRIPT_DIR/logs"
 
+resolve_video_device() {
+  if [[ -e "$VIDEO_DEVICE" ]]; then
+    SELECTED_VIDEO_DEVICE="$VIDEO_DEVICE"
+    return 0
+  fi
+
+  shopt -s nullglob
+  local devices=(/dev/video*)
+  shopt -u nullglob
+
+  if [[ ${#devices[@]} -gt 0 ]]; then
+    SELECTED_VIDEO_DEVICE="${devices[0]}"
+    echo "WARN: Requested device $VIDEO_DEVICE not found. Using ${SELECTED_VIDEO_DEVICE} instead."
+    return 0
+  fi
+
+  echo "ERROR: No V4L2 camera device found (no /dev/video*)."
+  echo "Fix options:"
+  echo "  1) Connect/enable a USB or CSI camera"
+  echo "  2) For Raspberry Pi CSI camera, enable V4L2 bridge: sudo modprobe bcm2835-v4l2"
+  echo "  3) Re-run with VIDEO_DEVICE=/dev/videoX if your device path is different"
+  return 1
+}
+
 CONDA_SH_PATH=""
 if ! CONDA_SH_PATH="$(find_conda_sh)"; then
   echo "ERROR: conda.sh not found (checked miniforge3/miniconda3/anaconda3)."
@@ -79,8 +104,13 @@ echo "Workspace: $SCRIPT_DIR"
 echo "Conda env: $CONDA_ENV_NAME"
 echo "Mode: $MODE"
 
+if ! resolve_video_device; then
+  exit 1
+fi
+echo "Video device: $SELECTED_VIDEO_DEVICE"
+
 action_camera_only() {
-  ros2 run camera_sensor camera_node --ros-args -p video_device:="$VIDEO_DEVICE"
+  ros2 run camera_sensor camera_node
 }
 
 action_all_nodes() {
@@ -88,7 +118,7 @@ action_all_nodes() {
   start_node imu_node ros2 run imu_sensor imu_node
   start_node encoder_node ros2 run encoder_odometry encoder_node
   start_node robot_controller ros2 run robot_controller robot_controller
-  start_node camera_node ros2 run camera_sensor camera_node --ros-args -p video_device:="$VIDEO_DEVICE"
+  start_node camera_node ros2 run camera_sensor camera_node
 
   echo ""
   echo "All nodes started. Press Ctrl+C to stop all."
