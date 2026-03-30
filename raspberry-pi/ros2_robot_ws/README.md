@@ -28,6 +28,12 @@ ros2_robot_ws/
 │   │   │   └── encoder_node.hpp
 │   │   ├── CMakeLists.txt
 │   │   └── package.xml
+│   ├── camera_sensor/          # Camera Publisher Nodes (Pi camera + webcam)
+│   │   ├── camera_sensor/
+│   │   │   ├── camera_node.py
+│   │   │   └── webcam_node.py
+│   │   ├── CMakeLists.txt
+│   │   └── package.xml
 │   └── robot_controller/       # Main Robot Controller
 │       ├── src/
 │       │   └── robot_controller.cpp
@@ -167,6 +173,20 @@ colcon build --packages-select motor_control
 
 **Description:** Coordinates all subsystems, validates commands, monitors battery, and manages emergency stops.
 
+### 5. Camera Nodes (`camera_node`, `webcam_node`)
+- **Package:** `camera_sensor`
+- **Executables:** `camera_node`, `webcam_node`
+- **Publishes to:** `/camera/raw` (sensor_msgs/Image)
+- **Parameters (webcam_node):**
+  - `device_index` (0) - webcam device index for OpenCV (for `/dev/video0`, use `0`)
+  - `image_width` (640)
+  - `image_height` (480)
+  - `publish_rate` (30.0)
+  - `frame_id` (`camera_link`)
+  - `camera_topic` (`/camera/raw`)
+
+**Description:** `camera_node` is for Raspberry Pi camera stack, while `webcam_node` streams frames from a USB/V4L2 webcam and publishes to `/camera/raw`.
+
 ## Running the Nodes
 
 ### Terminal 1 - Core Motor Control System
@@ -208,6 +228,32 @@ ros2 topic pub -1 /cmd_vel geometry_msgs/msg/Twist \
 # Move with rotation
 ros2 topic pub -1 /cmd_vel geometry_msgs/msg/Twist \
   '{linear: {x: 0.5, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.2}}'
+```
+
+### Camera Node Shortcuts
+
+Use the helper script to start camera nodes:
+
+```bash
+cd ~/ros2_robot_ws
+./start_node.sh camera    # Raspberry Pi camera node
+./start_node.sh webcam    # USB/V4L2 webcam node publishing /camera/raw
+```
+
+Select a different webcam device:
+
+```bash
+./start_node.sh webcam /dev/video1
+VIDEO_DEVICE=/dev/video1 ./start_node.sh webcam
+# or explicitly
+WEBCAM_DEVICE_INDEX=1 ./start_node.sh webcam
+```
+
+Verify stream:
+
+```bash
+source install/setup.sh
+ros2 topic hz /camera/raw
 ```
 
 ## Key Topics

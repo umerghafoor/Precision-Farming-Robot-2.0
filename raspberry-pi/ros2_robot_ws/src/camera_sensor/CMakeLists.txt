@@ -16,4 +16,10 @@ install(PROGRAMS
   RENAME camera_node
 )
 
+install(PROGRAMS
+  camera_sensor/webcam_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME webcam_node
+)
+
 ament_package()

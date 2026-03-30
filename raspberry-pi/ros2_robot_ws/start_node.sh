@@ -4,9 +4,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-all}"
+VIDEO_DEVICE_ARG="${2:-}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-ros2}"
 VIDEO_DEVICE="${VIDEO_DEVICE:-/dev/video0}"
 SELECTED_VIDEO_DEVICE=""
+WEBCAM_DEVICE_INDEX="${WEBCAM_DEVICE_INDEX:-}"
+SELECTED_WEBCAM_DEVICE_INDEX=""
+
+if [[ -n "$VIDEO_DEVICE_ARG" ]]; then
+  VIDEO_DEVICE="$VIDEO_DEVICE_ARG"
+fi
 
 PIDS=()
 
@@ -77,6 +84,16 @@ resolve_video_device() {
   return 1
 }
 
+device_path_to_index() {
+  local device_path="$1"
+  if [[ "$device_path" =~ ^/dev/video([0-9]+)$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+
+  return 1
+}
+
 CONDA_SH_PATH=""
 if ! CONDA_SH_PATH="$(find_conda_sh)"; then
   echo "ERROR: conda.sh not found (checked miniforge3/miniconda3/anaconda3)."
@@ -109,8 +126,26 @@ if ! resolve_video_device; then
 fi
 echo "Video device: $SELECTED_VIDEO_DEVICE"
 
+if [[ -z "$WEBCAM_DEVICE_INDEX" ]]; then
+  if ! SELECTED_WEBCAM_DEVICE_INDEX="$(device_path_to_index "$SELECTED_VIDEO_DEVICE")"; then
+    echo "ERROR: Could not extract webcam index from $SELECTED_VIDEO_DEVICE"
+    echo "Set WEBCAM_DEVICE_INDEX explicitly (example: WEBCAM_DEVICE_INDEX=1)"
+    exit 1
+  fi
+else
+  SELECTED_WEBCAM_DEVICE_INDEX="$WEBCAM_DEVICE_INDEX"
+fi
+
+echo "Webcam index: $SELECTED_WEBCAM_DEVICE_INDEX"
+
 action_camera_only() {
   ros2 run camera_sensor camera_node
+}
+
+action_webcam_only() {
+  ros2 run camera_sensor webcam_node --ros-args \
+    -p device_index:="$SELECTED_WEBCAM_DEVICE_INDEX" \
+    -p camera_topic:=/camera/raw
 }
 
 action_all_nodes() {
@@ -132,14 +167,22 @@ case "$MODE" in
     echo "Starting camera node only..."
     action_camera_only
     ;;
+  webcam)
+    echo "Starting webcam node only..."
+    action_webcam_only
+    ;;
   all)
     action_all_nodes
     ;;
   *)
-    echo "Usage: ./start_node.sh [camera|all]"
+    echo "Usage: ./start_node.sh [camera|webcam|all] [video_device]"
     echo "Examples:"
     echo "  ./start_node.sh camera"
+    echo "  ./start_node.sh webcam"
+    echo "  ./start_node.sh webcam /dev/video1"
     echo "  VIDEO_DEVICE=/dev/video1 ./start_node.sh camera"
+    echo "  VIDEO_DEVICE=/dev/video1 ./start_node.sh webcam"
+    echo "  WEBCAM_DEVICE_INDEX=1 ./start_node.sh webcam"
     echo "  ./start_node.sh all"
     exit 1
     ;;
