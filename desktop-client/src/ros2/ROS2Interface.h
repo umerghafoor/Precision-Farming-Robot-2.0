@@ -23,10 +23,11 @@
  * Uses signal/slot mechanism to communicate with Qt UI
  *
  * Image handling notes:
- *  - The imageCallback method explicitly converts incoming BGR8 frames to
- *    RGB8 so that the video widget never has to guess at channel order.
- *  - Any other encodings are passed through with a warning log; callers
- *    should be prepared to handle malformed data.
+ *  - The imageCallback method converts incoming images to RGB8:
+ *    - BGR8 frames are converted via channel swap
+ *    - RGB8 frames are passed through as-is
+ *    - YUV420 frames are converted using BT.601 coefficients
+ *  - Any other unsupported encodings are logged as warnings with fallback
  *  - A test hook (IMAGE_PIPELINE_TEST env var) can inject a synthetic
  *    BGR8 message during initialization to verify the conversion path.
  */

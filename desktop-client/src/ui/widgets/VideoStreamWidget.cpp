@@ -49,7 +49,7 @@ void VideoStreamWidget::setupUI()
     m_videoLabel = new QLabel();
     m_videoLabel->setAlignment(Qt::AlignCenter);
     m_videoLabel->setStyleSheet("QLabel { background-color: black; }");
-    m_videoLabel->setScaledContents(true);
+    m_videoLabel->setScaledContents(false);
     m_videoLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     containerLayout->addWidget(m_videoLabel);
 
@@ -135,12 +135,17 @@ void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, 
         return;
     }
 
-    // ROS2Interface is responsible for converting any BGR8 frames to RGB8
-    // before emitting imageReceived. Here we simply treat the payload as RGB.
-    QImage image(reinterpret_cast<const uchar*>(imageData.data()),
-                 width, height, width * 3, QImage::Format_RGB888);
-    if (image.isNull()) {
+    // Build an owning copy of the RGB888 frame, then convert to RGB32 for
+    // robust platform rendering through QPixmap/QLabel.
+    QImage view(reinterpret_cast<const uchar*>(imageData.constData()),
+                width, height, width * 3, QImage::Format_RGB888);
+    if (view.isNull()) {
         Logger::instance().error("Failed to create QImage from received data");
+        return;
+    }
+    QImage image = view.copy().convertToFormat(QImage::Format_RGB32);
+    if (image.isNull()) {
+        Logger::instance().error("Failed to convert RGB frame to display format");
         return;
     }
 

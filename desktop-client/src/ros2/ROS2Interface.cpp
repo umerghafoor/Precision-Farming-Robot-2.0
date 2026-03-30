@@ -241,20 +241,210 @@ void ROS2Interface::imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
     // Convert ROS image to QByteArray. We must be explicit about BGR→RGB
     // because OpenCV publishers use BGR8, whereas QImage expects RGB888.
     QByteArray imageData;
+    const int width = static_cast<int>(msg->width);
+    const int height = static_cast<int>(msg->height);
+
+    auto yuvToRgb = [](int y, int u, int v, uchar* dst) {
+        // Full-range BT.601 conversion (common for camera YUV frames)
+        const int c = y;
+        const int d = u - 128;
+        const int e = v - 128;
+
+        const int r = c + ((359 * e) >> 8);
+        const int g = c - ((88 * d + 183 * e) >> 8);
+        const int b = c + ((454 * d) >> 8);
+
+        dst[0] = static_cast<uchar>(qBound(0, r, 255));
+        dst[1] = static_cast<uchar>(qBound(0, g, 255));
+        dst[2] = static_cast<uchar>(qBound(0, b, 255));
+    };
 
     if (msg->encoding == "bgr8") {
-        // Perform explicit BGR→RGB conversion on every pixel
-        imageData.resize(msg->data.size());
-        for (size_t i = 0; i < msg->data.size(); i += 3) {
-            imageData[i]     = msg->data[i + 2]; // R
-            imageData[i + 1] = msg->data[i + 1]; // G
-            imageData[i + 2] = msg->data[i];     // B
+        // Perform explicit BGR→RGB conversion, honoring ROS row stride (step)
+        int srcStep = static_cast<int>(msg->step);
+        const size_t payloadSize = msg->data.size();
+        const int derivedStep = (height > 0 && (payloadSize % static_cast<size_t>(height) == 0))
+                                ? static_cast<int>(payloadSize / static_cast<size_t>(height))
+                                : 0;
+        const int minStep = width * 3;
+        if (srcStep < minStep) {
+            if (derivedStep >= minStep) {
+                Logger::instance().warning(QString("Invalid BGR8 step %1, using derived step %2 from payload")
+                                           .arg(srcStep).arg(derivedStep));
+                srcStep = derivedStep;
+            } else {
+                Logger::instance().warning(QString("Invalid BGR8 step: expected >= %1, got %2")
+                                           .arg(minStep).arg(srcStep));
+                return;
+            }
         }
-        Logger::instance().debug("Converted BGR8 frame to RGB8");
+        if (static_cast<size_t>(srcStep) * static_cast<size_t>(height) > payloadSize) {
+            Logger::instance().warning(QString("BGR8 payload too small for step=%1 height=%2 (payload=%3)")
+                                       .arg(srcStep).arg(height).arg(payloadSize));
+            return;
+        }
+
+        imageData.resize(width * height * 3);
+        const uint8_t* src = msg->data.data();
+        uchar* dst = reinterpret_cast<uchar*>(imageData.data());
+        for (int y = 0; y < height; ++y) {
+            const uint8_t* row = src + (y * srcStep);
+            for (int x = 0; x < width; ++x) {
+                const int si = x * 3;
+                const int di = (y * width + x) * 3;
+                dst[di]     = row[si + 2]; // R
+                dst[di + 1] = row[si + 1]; // G
+                dst[di + 2] = row[si];     // B
+            }
+        }
+        Logger::instance().debug("Converted BGR8 frame to RGB8 (step-aware)");
     } else if (msg->encoding == "rgb8") {
-        // Data already in correct order
-        imageData = QByteArray(reinterpret_cast<const char*>(msg->data.data()), 
-                               msg->data.size());
+        // Copy RGB8 data while honoring row stride; optionally swap if source is mislabeled.
+        int srcStep = static_cast<int>(msg->step);
+        const size_t payloadSize = msg->data.size();
+        const int derivedStep = (height > 0 && (payloadSize % static_cast<size_t>(height) == 0))
+                                ? static_cast<int>(payloadSize / static_cast<size_t>(height))
+                                : 0;
+        const int minStep = width * 3;
+        if (srcStep < minStep) {
+            if (derivedStep >= minStep) {
+                Logger::instance().warning(QString("Invalid RGB8 step %1, using derived step %2 from payload")
+                                           .arg(srcStep).arg(derivedStep));
+                srcStep = derivedStep;
+            } else {
+                Logger::instance().warning(QString("Invalid RGB8 step: expected >= %1, got %2")
+                                           .arg(minStep).arg(srcStep));
+                return;
+            }
+        }
+        if (static_cast<size_t>(srcStep) * static_cast<size_t>(height) > payloadSize) {
+            Logger::instance().warning(QString("RGB8 payload too small for step=%1 height=%2 (payload=%3)")
+                                       .arg(srcStep).arg(height).arg(payloadSize));
+            return;
+        }
+
+        const bool forceBgrFromRgb = (qgetenv("FORCE_BGR_FROM_RGB8") == "1");
+        imageData.resize(width * height * 3);
+        const uint8_t* src = msg->data.data();
+        uchar* dst = reinterpret_cast<uchar*>(imageData.data());
+        const bool has4BytePixels = (srcStep >= width * 4) && (derivedStep >= width * 4);
+        const QString rgbaOrder = QString::fromLocal8Bit(qgetenv("RGB8_4BYTE_ORDER")).trimmed().toUpper();
+
+        if (has4BytePixels) {
+            // Some pipelines publish 4-byte RGBX/BGRX frames but label as rgb8.
+            // Interpret according to RGB8_4BYTE_ORDER (BGRX default).
+            const QString order = rgbaOrder.isEmpty() ? "BGRX" : rgbaOrder;
+            for (int y = 0; y < height; ++y) {
+                const uint8_t* row = src + (y * srcStep);
+                for (int x = 0; x < width; ++x) {
+                    const int si = x * 4;
+                    const int di = (y * width + x) * 3;
+                    const uint8_t p0 = row[si];
+                    const uint8_t p1 = row[si + 1];
+                    const uint8_t p2 = row[si + 2];
+                    const uint8_t p3 = row[si + 3];
+
+                    if (order == "RGBX" || order == "RGBA") {
+                        dst[di] = p0; dst[di + 1] = p1; dst[di + 2] = p2;
+                    } else if (order == "XRGB" || order == "ARGB") {
+                        dst[di] = p1; dst[di + 1] = p2; dst[di + 2] = p3;
+                    } else if (order == "XBGR" || order == "ABGR") {
+                        dst[di] = p3; dst[di + 1] = p2; dst[di + 2] = p1;
+                    } else {
+                        // Default BGRX/BGRA
+                        dst[di] = p2; dst[di + 1] = p1; dst[di + 2] = p0;
+                    }
+                }
+            }
+            Logger::instance().warning(QString("RGB8 stream interpreted as 4-byte pixels (order=%1, step=%2)")
+                                       .arg(order).arg(srcStep));
+        } else {
+            for (int y = 0; y < height; ++y) {
+                const uint8_t* row = src + (y * srcStep);
+                for (int x = 0; x < width; ++x) {
+                    const int si = x * 3;
+                    const int di = (y * width + x) * 3;
+                    if (forceBgrFromRgb) {
+                        // Some camera pipelines incorrectly tag BGR as RGB8.
+                        dst[di]     = row[si + 2];
+                        dst[di + 1] = row[si + 1];
+                        dst[di + 2] = row[si];
+                    } else {
+                        dst[di]     = row[si];
+                        dst[di + 1] = row[si + 1];
+                        dst[di + 2] = row[si + 2];
+                    }
+                }
+            }
+        }
+
+        if (forceBgrFromRgb) {
+            Logger::instance().warning("RGB8 stream forced through BGR->RGB swap (FORCE_BGR_FROM_RGB8=1)");
+        }
+    } else if (msg->encoding == "i420" || msg->encoding == "yv12" ||
+               msg->encoding == "nv12" || msg->encoding == "nv21" ||
+               msg->encoding == "yuv420") {
+        const size_t ySize = static_cast<size_t>(width) * static_cast<size_t>(height);
+        const size_t expectedYuv420Size = ySize + (ySize / 2);
+
+        if (msg->data.size() < expectedYuv420Size) {
+            Logger::instance().warning(QString("YUV420 payload too small: expected at least %1, got %2")
+                                       .arg(expectedYuv420Size)
+                                       .arg(msg->data.size()));
+            return;
+        }
+
+        QString layout = QString::fromStdString(msg->encoding).toLower();
+        if (layout == "yuv420") {
+            // 'yuv420' is ambiguous in the wild. Default to NV12 for Pi camera pipelines,
+            // and allow operator override via YUV420_LAYOUT=nv12|nv21|i420|yv12.
+            const QString override = QString::fromLocal8Bit(qgetenv("YUV420_LAYOUT")).trimmed().toLower();
+            if (override == "nv12" || override == "nv21" || override == "i420" || override == "yv12") {
+                layout = override;
+            } else {
+                layout = "nv12";
+            }
+        }
+
+        imageData.resize(width * height * 3);
+        const uint8_t* base = msg->data.data();
+        const uint8_t* yPlane = base;
+        uchar* rgbPtr = reinterpret_cast<uchar*>(imageData.data());
+
+        if (layout == "i420" || layout == "yv12") {
+            const uint8_t* planeA = yPlane + ySize;
+            const uint8_t* planeB = planeA + (ySize / 4);
+            const uint8_t* uPlane = (layout == "i420") ? planeA : planeB;
+            const uint8_t* vPlane = (layout == "i420") ? planeB : planeA;
+
+            for (int y = 0; y < height; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    const int yIdx = y * width + x;
+                    const int uvIdx = (y / 2) * (width / 2) + (x / 2);
+                    yuvToRgb(yPlane[yIdx], uPlane[uvIdx], vPlane[uvIdx], &rgbPtr[yIdx * 3]);
+                }
+            }
+        } else {
+            // NV12/NV21: Y plane + interleaved chroma plane at half resolution
+            const uint8_t* uvPlane = yPlane + ySize;
+            const bool isNv21 = (layout == "nv21");
+
+            for (int y = 0; y < height; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    const int yIdx = y * width + x;
+                    const int uvRow = y / 2;
+                    const int uvCol = (x / 2) * 2;
+                    const int uvIdx = uvRow * width + uvCol;
+
+                    const uint8_t u = isNv21 ? uvPlane[uvIdx + 1] : uvPlane[uvIdx];
+                    const uint8_t v = isNv21 ? uvPlane[uvIdx] : uvPlane[uvIdx + 1];
+                    yuvToRgb(yPlane[yIdx], u, v, &rgbPtr[yIdx * 3]);
+                }
+            }
+        }
+
+        Logger::instance().debug(QString("Converted %1 frame to RGB8")
+                                 .arg(layout.toUpper()));
     } else {
         // Unknown/unsupported encoding: try to treat as RGB and warn operator
         Logger::instance().warning(QString("Unsupported image encoding '%1'; "
