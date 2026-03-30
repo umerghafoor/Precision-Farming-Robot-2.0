@@ -3,6 +3,7 @@
 #include "TwinSimulator.h"
 #include "ROS2Interface.h"
 #include "Logger.h"
+#include <QVector3D>
 
 DigitalTwin::DigitalTwin(QObject *parent)
     : QObject(parent)
@@ -60,6 +61,10 @@ void DigitalTwin::setupConnections(ROS2Interface* ros2)
             this, &DigitalTwin::onROS2IMUReceived);
     connect(ros2, &ROS2Interface::robotStatusReceived,
             this, &DigitalTwin::onROS2StatusReceived);
+    connect(ros2, &ROS2Interface::coordinatesReceived,
+            this, &DigitalTwin::onROS2CoordinatesReceived);
+    connect(ros2, &ROS2Interface::velocityCommandIssued,
+            this, &DigitalTwin::onVelocityCommand);
 }
 
 void DigitalTwin::setMode(Mode mode)
@@ -116,6 +121,36 @@ void DigitalTwin::onROS2StatusReceived(const QString& status)
 {
     if (m_state) {
         m_state->setRobotStatus(status);
+    }
+}
+
+void DigitalTwin::onVelocityCommand(double linear, double angular)
+{
+    if (!m_state) return;
+
+    // In Synchronized mode the real robot moves and /coordinates drives the twin.
+    // In Simulated / Offline mode we integrate the command ourselves.
+    if (m_mode == Mode::Synchronized) return;
+
+    TwinState::Velocity vel;
+    vel.linear  = QVector3D(linear,  0.0, 0.0); // forward in robot frame
+    vel.angular = QVector3D(0.0, 0.0, angular);  // yaw rate
+    m_state->setVelocity(vel);
+
+    // Auto-start the simulator on first non-zero command so the user
+    // doesn't have to manually switch to Simulated mode.
+    if (!m_simulator->isRunning()) {
+        m_simulator->start();
+        m_mode = Mode::Simulated;
+        emit modeChanged(m_mode);
+    }
+}
+
+void DigitalTwin::onROS2CoordinatesReceived(double x, double y)
+{
+    if (m_state && m_mode == Mode::Synchronized) {
+        m_state->updatePosition(QVector3D(x, y, 0.0));
+        emit stateChanged();
     }
 }
 

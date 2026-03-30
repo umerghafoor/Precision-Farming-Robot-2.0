@@ -63,6 +63,10 @@ signals:
     void coordinatesReceived(double x, double y);
     void coordinatesJsonReceived(const QString& data);
 
+    // Emitted whenever a velocity command is sent (linear_x, angular_z)
+    // Used by the digital twin to simulate motion without real robot feedback
+    void velocityCommandIssued(double linear, double angular);
+
 public slots:
     void start();
     void stop();

@@ -71,6 +71,8 @@ private slots:
     void onROS2ImageReceived(const QByteArray& imageData, int width, int height);
     void onROS2IMUReceived(double ax, double ay, double az, double gx, double gy, double gz);
     void onROS2StatusReceived(const QString& status);
+    void onROS2CoordinatesReceived(double x, double y);
+    void onVelocityCommand(double linear, double angular);
     void onSimulationUpdate();
 
 private:

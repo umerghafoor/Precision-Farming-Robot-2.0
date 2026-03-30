@@ -75,7 +75,8 @@ void MainWindow::createMenus()
     // widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
     widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
-    // widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization); // Disabled: Digital Twin widget hidden
+    widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
+    widgetsMenu->addAction(tr("Add &Robot 3D Model"), this, &MainWindow::onAddRobotModel);
     widgetsMenu->addSeparator();
     widgetsMenu->addAction(tr("&Remove Widget"), this, &MainWindow::onRemoveWidget);
 
@@ -83,11 +84,6 @@ void MainWindow::createMenus()
     QMenu* ros2Menu = menuBar()->addMenu(tr("&ROS2"));
     m_connectAction = ros2Menu->addAction(tr("&Connect"), this, &MainWindow::onToggleROS2Connection);
     m_connectAction->setCheckable(true);
-
-    // Simulation menu
-    QMenu* simMenu = menuBar()->addMenu(tr("&Simulation"));
-    m_simulateAction = simMenu->addAction(tr("&Start Simulation"), this, &MainWindow::onToggleSimulation);
-    m_simulateAction->setCheckable(true);
 
     // Help menu
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
@@ -99,9 +95,7 @@ void MainWindow::createMenus()
     badgeLayout->setContentsMargins(0,0,0,0);
     badgeLayout->setSpacing(8);
     m_ros2Badge = new StatusBadge(tr("ROS2 Offline"), this);
-    m_simBadge  = new StatusBadge(tr("Simulation Off"), this);
     badgeLayout->addWidget(m_ros2Badge);
-    badgeLayout->addWidget(m_simBadge);
     badgeContainer->setObjectName("appBarBadgeContainer");
     menuBar()->setCornerWidget(badgeContainer, Qt::TopRightCorner);
 
@@ -124,10 +118,7 @@ void MainWindow::createToolBar()
     if (auto btn = qobject_cast<QToolButton*>(toolbar->widgetForAction(m_connectAction))) {
         btn->setObjectName("connectButton");
     }
-    toolbar->addAction(m_simulateAction);
-    if (auto btn = qobject_cast<QToolButton*>(toolbar->widgetForAction(m_simulateAction))) {
-        btn->setObjectName("simulateButton");
-    }
+
 }
 
 void MainWindow::createStatusBar()
@@ -154,13 +145,6 @@ void MainWindow::setDigitalTwin(DigitalTwin* twin)
 {
     m_digitalTwin = twin;
     
-    // connect badge update for simulation mode
-    if (m_digitalTwin) {
-        connect(m_digitalTwin, &DigitalTwin::modeChanged, this, &MainWindow::onSimulationModeChanged);
-        // set initial state
-        onSimulationModeChanged(m_digitalTwin->mode());
-    }
-
     // Create or restore layout after all dependencies are set
     if (m_widgetManager && m_ros2Interface && m_digitalTwin) {
         // always create the standard set of docks first so restoreState can act on them
@@ -345,9 +329,14 @@ void MainWindow::onAddCoordinates()
 
 void MainWindow::onAddTwinVisualization()
 {
-    // Disabled: Digital Twin widget creation is intentionally turned off
-    Logger::instance().info("Digital Twin widget creation is disabled");
-    return;
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::TwinVisualization, this);
+    addWidgetToDock(widget, "Digital Twin");
+}
+
+void MainWindow::onAddRobotModel()
+{
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::RobotModel3D, this);
+    addWidgetToDock(widget, "Robot 3D Model");
 }
 
 void MainWindow::onRemoveWidget()
@@ -370,23 +359,6 @@ void MainWindow::onToggleROS2Connection()
     } else {
         m_ros2Interface->stop();
         statusBar()->showMessage(tr("Disconnecting from ROS2..."), 2000);
-    }
-}
-
-void MainWindow::onToggleSimulation()
-{
-    if (!m_digitalTwin) {
-        QMessageBox::warning(this, tr("Error"), tr("Digital Twin not initialized"));
-        m_simulateAction->setChecked(false);
-        return;
-    }
-
-    if (m_simulateAction->isChecked()) {
-        m_digitalTwin->startSimulation();
-        statusBar()->showMessage(tr("Simulation started"), 2000);
-    } else {
-        m_digitalTwin->stopSimulation();
-        statusBar()->showMessage(tr("Simulation stopped"), 2000);
     }
 }
 
@@ -445,23 +417,6 @@ void MainWindow::onROS2Disconnected()
     if (m_ros2Badge) {
         m_ros2Badge->setText(tr("ROS2 Offline"));
         m_ros2Badge->setDotColor(QColor("#7A9B79")); // grey
-    }
-}
-
-void MainWindow::onSimulationModeChanged(DigitalTwin::Mode mode)
-{
-    Logger::instance().info(QString("MainWindow: simulation mode changed to %1").arg(static_cast<int>(mode)));
-    if (!m_simBadge) return;
-
-    switch (mode) {
-    case DigitalTwin::Mode::Simulated:
-        m_simBadge->setText(tr("Simulation On"));
-        m_simBadge->setDotColor(QColor("#52C44A"));
-        break;
-    default:
-        m_simBadge->setText(tr("Simulation Off"));
-        m_simBadge->setDotColor(QColor("#7A9B79"));
-        break;
     }
 }
 

@@ -267,6 +267,7 @@ void ROS2Interface::publishVelocityCommand(double linear_x, double linear_y, dou
     Logger::instance().debug(QString("Velocity command (stub): linear_x=%1, linear_y=%2, angular_z=%3")
                             .arg(linear_x).arg(linear_y).arg(angular_z));
 #endif
+    emit velocityCommandIssued(linear_x, angular_z);
 }
 
 void ROS2Interface::publishRobotCommand(const QString& command)
