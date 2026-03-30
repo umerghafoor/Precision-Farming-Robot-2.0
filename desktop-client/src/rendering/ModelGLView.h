@@ -9,6 +9,7 @@
 #include <QMap>
 #include <QPoint>
 #include <QVector3D>
+#include <QQuaternion>
 
 // GPU-side representation of one OBJ object
 struct GLMesh {
@@ -44,6 +45,9 @@ public:
     // Cumulative rotation angle (degrees) around the wheel's own X axis
     void setWheelAngle(const QString &objectName, float angleDegrees);
 
+    // Move/orient the robot on the ground plane (ROS world coords)
+    void setRobotPose(const QVector3D &pos, const QQuaternion &ori);
+
     void resetCamera();
 
 signals:
@@ -62,6 +66,7 @@ private:
     void uploadPendingMeshes();
     void drawMesh(const GLMesh &mesh);
     QMatrix4x4 wheelModelMatrix(const GLMesh &mesh) const;
+    void setupGrid(float sceneSize, float groundY);
 
     QOpenGLShaderProgram  *m_program      = nullptr;
     bool                   m_glReady      = false;
@@ -75,11 +80,26 @@ private:
     QMap<QString, QVector3D> m_colorOverrides;
     QMap<QString, float>     m_wheelAngles;
 
+    // Ground-plane grid
+    GLuint  m_gridVao       = 0;
+    GLuint  m_gridVbo       = 0;
+    int     m_gridLineVerts = 0;
+    bool    m_gridReady     = false;
+
+    // Robot world pose (updated via setRobotPose)
+    QMatrix4x4  m_robotMatrix;      // cached transform applied to all robot meshes
+    QVector3D   m_robotPos;
+    QQuaternion m_robotOri;
+
     // Orbit camera state
-    float     m_azimuth   =  30.0f;   // degrees, around world Y
-    float     m_elevation =  18.0f;   // degrees, above horizon
-    float     m_distance  =  10.0f;   // world units
+    float     m_azimuth         =  30.0f;
+    float     m_elevation       =  18.0f;
+    float     m_distance        =  10.0f;
     QVector3D m_target;
+
+    // Saved initial fit — restored by resetCamera()
+    float     m_initialDistance =  10.0f;
+    QVector3D m_initialTarget;
 
     QMatrix4x4 m_proj;
     QPoint     m_lastMouse;

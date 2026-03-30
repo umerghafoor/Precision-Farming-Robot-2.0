@@ -105,7 +105,7 @@ QToolBar QToolButton {
     background-color: #2E7D32;
     color: #FFFFFF;
     border: 1px solid #2E7D32;
-    border-radius: 2px;
+    border-radius: 6px;
     padding: 5px 14px;
     font-size: 13px;
     font-weight: 500;
@@ -120,13 +120,8 @@ QToolBar QToolButton:checked {
     border-color: #1B5E20;
 }
 
-/* Connect / Simulate — inherit green QToolButton base, just set min sizes */
 QToolButton#connectButton {
     min-width: 80px;
-    min-height: 28px;
-}
-QToolButton#simulateButton {
-    min-width: 110px;
     min-height: 28px;
 }
 
@@ -208,7 +203,7 @@ QPushButton {
     background-color: #2E7D32;
     color: #FFFFFF;
     border: 1px solid #2E7D32;
-    border-radius: 2px;
+    border-radius: 6px;
     padding: 6px 16px;
     font-size: 13px;
     font-weight: 500;
@@ -237,7 +232,7 @@ QPushButton#stopButton {
     color: #E65100;
     border: 1.5px solid #E65100;
     background-color: #FFFFFF;
-    border-radius: 2px;
+    border-radius: 6px;
     font-weight: 600;
 }
 QPushButton#stopButton:hover {
@@ -252,7 +247,7 @@ QPushButton#emergencyStopButton {
     background-color: #C62828;
     color: #FFFFFF;
     border: 1px solid #B71C1C;
-    border-radius: 2px;
+    border-radius: 6px;
     font-weight: 700;
 }
 QPushButton#emergencyStopButton:hover {
@@ -269,7 +264,7 @@ SidebarWidget QPushButton {
     background-color: #2E7D32;
     color: #FFFFFF;
     border: 1px solid #2E7D32;
-    border-radius: 2px;
+    border-radius: 6px;
     padding: 8px;
     min-width: 40px;
     min-height: 40px;

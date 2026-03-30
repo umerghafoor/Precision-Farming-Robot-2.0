@@ -33,10 +33,15 @@ static const char *FRAG_SRC = R"(
 in vec3 vNorm;
 
 uniform vec3 uColor;
+uniform bool uUnlit;   // true → flat color (used for grid lines)
 
 out vec4 FragColor;
 
 void main() {
+    if (uUnlit) {
+        FragColor = vec4(uColor, 1.0);
+        return;
+    }
     vec3 n    = normalize(vNorm);
     // Two-light Phong: warm key from top-right, cool fill from left
     vec3 key  = normalize(vec3( 1.0, 1.8, 1.2));
@@ -54,6 +59,7 @@ ModelGLView::ModelGLView(QWidget *parent)
     : QOpenGLWidget(parent)
 {
     setMouseTracking(false);
+    setFocusPolicy(Qt::WheelFocus);   // receive wheel events without a prior click
     QSurfaceFormat fmt;
     fmt.setVersion(3, 3);
     fmt.setProfile(QSurfaceFormat::CoreProfile);
@@ -68,6 +74,8 @@ ModelGLView::~ModelGLView()
         if (mesh.vao) glDeleteVertexArrays(1, &mesh.vao);
         if (mesh.vbo) glDeleteBuffers(1, &mesh.vbo);
     }
+    if (m_gridVao) glDeleteVertexArrays(1, &m_gridVao);
+    if (m_gridVbo) glDeleteBuffers(1, &m_gridVbo);
     delete m_program;
     doneCurrent();
 }
@@ -107,6 +115,10 @@ void ModelGLView::loadMeshes(const QVector<OBJMeshData> &meshes)
                                  gmax.y() - gmin.y()),
                                  gmax.z() - gmin.z());
         m_distance = maxDim * 1.4f;
+
+        // Save for resetCamera()
+        m_initialDistance = m_distance;
+        m_initialTarget   = m_target;
     }
 
     update();
@@ -130,10 +142,28 @@ void ModelGLView::setWheelAngle(const QString &name, float angleDeg)
     // Caller is responsible for calling update() once per frame
 }
 
+void ModelGLView::setRobotPose(const QVector3D &pos, const QQuaternion &ori)
+{
+    m_robotPos = pos;
+    m_robotOri = ori;
+
+    m_robotMatrix.setToIdentity();
+    // ROS convention: x=forward, y=left, z=up.
+    // Map onto the GL ground plane (Y-up): ROS(x,y) → GL(x, 0, -y).
+    m_robotMatrix.translate(pos.x(), 0.0f, -pos.y());
+    // Extract yaw (rotation around ROS Z = GL Y)
+    float yawRad = 2.0f * std::atan2(ori.z(), ori.scalar());
+    m_robotMatrix.rotate(qRadiansToDegrees(yawRad), 0.0f, 1.0f, 0.0f);
+
+    update();
+}
+
 void ModelGLView::resetCamera()
 {
     m_azimuth   =  30.0f;
     m_elevation =  18.0f;
+    m_distance  =  m_initialDistance;
+    m_target    =  m_initialTarget;
     update();
 }
 
@@ -201,6 +231,19 @@ void ModelGLView::paintGL()
     m_program->bind();
     m_program->setUniformValue("uPV", pv);
 
+    // ── Ground plane grid ────────────────────────────────────────────────────
+    if (m_gridReady) {
+        QMatrix4x4 identity;
+        m_program->setUniformValue("uModel",  identity);
+        m_program->setUniformValue("uColor",  QVector3D(0.20f, 0.32f, 0.20f));
+        m_program->setUniformValue("uUnlit",  true);
+        glBindVertexArray(m_gridVao);
+        glDrawArrays(GL_LINES, 0, m_gridLineVerts);
+        glBindVertexArray(0);
+        m_program->setUniformValue("uUnlit",  false);
+    }
+
+    // ── Robot meshes (with world pose applied) ───────────────────────────────
     for (const auto &mesh : m_meshes)
         drawMesh(mesh);
 
@@ -247,8 +290,13 @@ void ModelGLView::mouseReleaseEvent(QMouseEvent *)
 
 void ModelGLView::wheelEvent(QWheelEvent *e)
 {
-    float factor = e->angleDelta().y() > 0 ? 0.88f : 1.14f;
-    m_distance   = qBound(0.1f, m_distance * factor, 10000.0f);
+    int delta = e->angleDelta().y();
+    if (delta == 0) delta = e->pixelDelta().y();   // trackpad fallback
+    if (delta == 0) { e->ignore(); return; }
+
+    float factor = delta > 0 ? 0.88f : 1.14f;
+    m_distance   = qBound(0.01f, m_distance * factor, 10000.0f);
+    e->accept();
     update();
 }
 
@@ -256,6 +304,19 @@ void ModelGLView::wheelEvent(QWheelEvent *e)
 
 void ModelGLView::uploadPendingMeshes()
 {
+    // Compute scene bounds to position the grid correctly
+    QVector3D sMin( 1e9f,  1e9f,  1e9f);
+    QVector3D sMax(-1e9f, -1e9f, -1e9f);
+    for (const auto &data : m_pendingMeshes) {
+        if (data.vertices.isEmpty()) continue;
+        sMin = QVector3D(qMin(sMin.x(), data.boundsMin.x()),
+                         qMin(sMin.y(), data.boundsMin.y()),
+                         qMin(sMin.z(), data.boundsMin.z()));
+        sMax = QVector3D(qMax(sMax.x(), data.boundsMax.x()),
+                         qMax(sMax.y(), data.boundsMax.y()),
+                         qMax(sMax.z(), data.boundsMax.z()));
+    }
+
     for (const auto &data : m_pendingMeshes) {
         if (data.vertices.isEmpty()) continue;
 
@@ -290,6 +351,12 @@ void ModelGLView::uploadPendingMeshes()
         m_meshes.append(mesh);
     }
 
+    // Build ground grid now that we know the scene dimensions
+    float sceneSize = qMax(sMax.x() - sMin.x(),
+                      qMax(sMax.y() - sMin.y(),
+                           sMax.z() - sMin.z()));
+    setupGrid(sceneSize, sMin.y());
+
     m_pendingMeshes.clear();
     m_hasPending = false;
 }
@@ -298,9 +365,16 @@ void ModelGLView::drawMesh(const GLMesh &mesh)
 {
     QVector3D color = m_colorOverrides.value(mesh.name, mesh.defaultColor);
 
-    QMatrix4x4 model = m_wheelAngles.contains(mesh.name)
-                       ? wheelModelMatrix(mesh)
-                       : QMatrix4x4{};
+    // Base transform = robot world pose; wheels get an additional local spin
+    QMatrix4x4 model = m_robotMatrix;
+    if (m_wheelAngles.contains(mesh.name)) {
+        float angle = m_wheelAngles[mesh.name];
+        QMatrix4x4 spin;
+        spin.translate( mesh.centroid);
+        spin.rotate(angle, 1.0f, 0.0f, 0.0f);
+        spin.translate(-mesh.centroid);
+        model = model * spin;
+    }
 
     m_program->setUniformValue("uModel", model);
     m_program->setUniformValue("uColor", color);
@@ -315,9 +389,57 @@ QMatrix4x4 ModelGLView::wheelModelMatrix(const GLMesh &mesh) const
     float angle = m_wheelAngles[mesh.name];
     QMatrix4x4 m;
     m.translate(mesh.centroid);
-    m.rotate(angle, 1.0f, 0.0f, 0.0f);   // spin around world X (car lateral axis)
+    m.rotate(angle, 1.0f, 0.0f, 0.0f);
     m.translate(-mesh.centroid);
     return m;
+}
+
+void ModelGLView::setupGrid(float sceneSize, float groundY)
+{
+    // Delete any previous grid buffers
+    if (m_gridVao) { glDeleteVertexArrays(1, &m_gridVao); m_gridVao = 0; }
+    if (m_gridVbo) { glDeleteBuffers(1, &m_gridVbo); m_gridVbo = 0; }
+
+    // Cell size = ~25% of model extent; grid covers ±20 cells each way
+    float cell    = qMax(sceneSize * 0.25f, 0.01f);
+    int   half    = 20;
+    float ext     = half * cell;
+    float Y       = groundY - 0.001f;   // just below the model's feet
+
+    QVector<OBJVertex> verts;
+    verts.reserve((half * 2 + 1) * 4);
+
+    for (int i = -half; i <= half; ++i) {
+        float t = i * cell;
+        // Line along X
+        verts.push_back({ -ext, Y, t,   0.0f, 1.0f, 0.0f });
+        verts.push_back({  ext, Y, t,   0.0f, 1.0f, 0.0f });
+        // Line along Z
+        verts.push_back({ t, Y, -ext,   0.0f, 1.0f, 0.0f });
+        verts.push_back({ t, Y,  ext,   0.0f, 1.0f, 0.0f });
+    }
+
+    m_gridLineVerts = verts.size();
+
+    glGenVertexArrays(1, &m_gridVao);
+    glGenBuffers(1, &m_gridVbo);
+
+    glBindVertexArray(m_gridVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_gridVbo);
+    glBufferData(GL_ARRAY_BUFFER,
+                 (GLsizeiptr)(verts.size() * sizeof(OBJVertex)),
+                 verts.constData(),
+                 GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(OBJVertex), (void*)offsetof(OBJVertex, px));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(OBJVertex), (void*)offsetof(OBJVertex, nx));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+    m_gridReady = true;
 }
 
 #endif // HAVE_QT_OPENGL

@@ -12,7 +12,7 @@ class WidgetManager;
 class ROS2Interface;
 class BaseWidget;
 
-#include "twin/DigitalTwin.h"    // needed for DigitalTwin::Mode in slot signature
+#include "twin/DigitalTwin.h"
 
 /**
  * @brief Main application window with dockable widget system
@@ -48,13 +48,11 @@ private slots:
     void onAddRobotModel();
     void onRemoveWidget();
     void onToggleROS2Connection();
-    void onToggleSimulation();
     void onAbout();
 
     // status badge updates
     void onROS2Connected();
     void onROS2Disconnected();
-    void onSimulationModeChanged(DigitalTwin::Mode mode);
 
 private:
     void setupUI();
@@ -78,12 +76,10 @@ private:
 
     // UI elements
     QAction* m_connectAction;
-    QAction* m_simulateAction;
     bool m_ros2Connected;
 
     // persistent badges in title/menu bar
     StatusBadge *m_ros2Badge;
-    StatusBadge *m_simBadge;
 };
 
 #endif // MAINWINDOW_H

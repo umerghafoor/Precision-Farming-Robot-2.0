@@ -16,17 +16,13 @@
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-// OBJ object names that correspond to the four wheels (Bugatti placeholder).
-// Replace when swapping in the real robot model.
-static const QStringList WHEEL_OBJECT_NAMES = {
-    QStringLiteral("Cube.048_Cube.080"),
-    QStringLiteral("Cube.046_Cube.063"),
-    QStringLiteral("Cube.039")
-};
+// box.obj has no separate wheel sub-objects; leave empty so no mesh tinting
+// is applied and wheel rotation skips gracefully.
+static const QStringList WHEEL_OBJECT_NAMES = {};
 static const QStringList WHEEL_LABELS = { "FL", "FR", "RL" };
 
-// Placeholder wheel radius (m) for angular velocity conversion
-static constexpr float WHEEL_RADIUS = 0.35f;
+// Wheel radius (m) for angular velocity → angle conversion
+static constexpr float WHEEL_RADIUS = 0.10f;
 
 // ─── Status colour helpers ────────────────────────────────────────────────────
 
@@ -56,7 +52,7 @@ static QString colorToCSS(const QVector3D &c)
 
 static QString findModelFile()
 {
-    const QString name = QStringLiteral("bugatti.obj");
+    const QString name = QStringLiteral("box.obj");
     const QStringList candidates = {
         QCoreApplication::applicationDirPath() + "/" + name,
         QCoreApplication::applicationDirPath() + "/../" + name,
@@ -228,8 +224,8 @@ void RobotModelWidget::startLoading()
 {
     QString path = findModelFile();
     if (path.isEmpty()) {
-        m_loadLabel->setText("Model file not found (bugatti.obj)");
-        Logger::instance().warning("RobotModelWidget: bugatti.obj not found");
+        m_loadLabel->setText("Model file not found (box.obj)");
+        Logger::instance().warning("RobotModelWidget: box.obj not found");
         m_stack->setCurrentIndex(2);
         return;
     }
@@ -299,6 +295,9 @@ void RobotModelWidget::onTwinStateChanged()
     double batLevel = state->batteryLevel();
     updateBatteryDisplay(batLevel);
 
+    // ── Robot pose (moves the model on the ground plane) ─────────────────
+    m_glView->setRobotPose(state->pose().position, state->pose().orientation);
+
     // ── Wheel rotation (integrate angular velocity) ───────────────────────
     float dt = float(m_wheelTimer.restart()) / 1000.0f;
     dt = qBound(0.0f, dt, 0.1f);  // clamp; avoid large jump on first call
@@ -313,7 +312,7 @@ void RobotModelWidget::onTwinStateChanged()
     // ── Wheel status colour ───────────────────────────────────────────────
     updateWheelStatus(state->robotStatus());
 
-    m_glView->update();
+    // setRobotPose already calls update(); no extra call needed
 #endif
 }
 
