@@ -27,17 +27,16 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 # Keep this fixed so all ROS2 devices join the same communication domain.
 ROS_DOMAIN_ID=0
 HOST_CYCLONEDDS_CONFIG="${CYCLONEDDS_CONFIG_PATH:-$HOME/.ros/dds_config.xml}"
-LAPTOP_IP="${LAPTOP_IP:-192.168.0.113}"
-PI_IP="${PI_IP:-192.168.0.112}"
+LAPTOP_IP="${LAPTOP_IP:-100.101.83.33}"
+PI_IP="${PI_IP:-100.99.166.15}"
 
 mkdir -p "$(dirname "$HOST_CYCLONEDDS_CONFIG")"
 cat > "$HOST_CYCLONEDDS_CONFIG" <<EOF
-<?xml version="1.0"?>
-<
-<dds>
+<?xml version="1.0" encoding="UTF-8"?>
+<CycloneDDS xmlns="https://cdds.io/config">
   <Domain id="${ROS_DOMAIN_ID}">
     <General>
-      <NetworkInterfaceAddress>${LAPTOP_IP}</NetworkInterfaceAddress>
+      <NetworkInterfaceAddress>tailscale0</NetworkInterfaceAddress>
       <AllowMulticast>false</AllowMulticast>
     </General>
     <Discovery>
@@ -46,7 +45,7 @@ cat > "$HOST_CYCLONEDDS_CONFIG" <<EOF
       </Peers>
     </Discovery>
   </Domain>
-</dds>
+</CycloneDDS>
 EOF
 
 echo -e "${GREEN}=== Starting Docker Container ===${NC}"

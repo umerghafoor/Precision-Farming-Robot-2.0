@@ -9,7 +9,7 @@
 
 #ifdef USE_ROS2
 #include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
@@ -23,13 +23,12 @@
  * Uses signal/slot mechanism to communicate with Qt UI
  *
  * Image handling notes:
- *  - The imageCallback method converts incoming images to RGB8:
- *    - BGR8 frames are converted via channel swap
- *    - RGB8 frames are passed through as-is
- *    - YUV420 frames are converted using BT.601 coefficients
- *  - Any other unsupported encodings are logged as warnings with fallback
+ *  - The imageCallback method consumes CompressedImage frames where format is
+ *    expected as "gray4;WxH" or "gray8;WxH".
+ *  - Payload is expanded into RGB888 before emitting imageReceived.
+ *  - Unsupported/invalid formats are logged as warnings.
  *  - A test hook (IMAGE_PIPELINE_TEST env var) can inject a synthetic
- *    BGR8 message during initialization to verify the conversion path.
+ *    gray8 message during initialization to verify the conversion path.
  */
 class ROS2Interface : public QObject
 {
@@ -75,7 +74,8 @@ private:
     QString normalizeTopicName(const QString& topic) const;
 
 #ifdef USE_ROS2
-    using RawImageMsg = sensor_msgs::msg::Image;
+    
+    using RawImageMsg = sensor_msgs::msg::CompressedImage;
 
     rclcpp::QoS createImageSubscriptionQos() const;
     bool createImageSubscription(const QString& topic);
