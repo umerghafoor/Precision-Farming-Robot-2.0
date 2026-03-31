@@ -1,5 +1,6 @@
 #include "ROS2Interface.h"
 #include "Logger.h"
+#include <QImage>
 #include <QTimer>
 
 ROS2Interface::ROS2Interface(int argc, char** argv, QObject *parent)
@@ -136,8 +137,7 @@ void ROS2Interface::setupPublishers()
 void ROS2Interface::setupSubscribers()
 {
 #ifdef USE_ROS2
-    // Image subscriber - use sensor-stream QoS for high-rate camera frames.
-    createImageSubscription("camera/raw");
+    // Camera topic is intentionally on-demand and subscribed by UI pages only.
 
     // IMU subscriber
     m_imuSubscriber = m_node->create_subscription<sensor_msgs::msg::Imu>(
@@ -165,23 +165,40 @@ void ROS2Interface::setupSubscribers()
 
 void ROS2Interface::switchCameraTopic(const QString& topic)
 {
+    subscribeCameraTopic(topic);
+}
+
+void ROS2Interface::subscribeCameraTopic(const QString& topic)
+{
 #ifdef USE_ROS2
     if (!m_node) {
-        Logger::instance().warning("Cannot switch camera topic - node not initialized");
+        Logger::instance().warning("Cannot subscribe camera topic - node not initialized");
         return;
     }
 
-    // Unsubscribe from current topic
+    // Replace existing camera subscription with the requested topic.
     if (m_imageSubscriber) {
         m_imageSubscriber.reset();
         Logger::instance().debug("Unsubscribed from previous camera topic");
     }
 
     if (!createImageSubscription(topic)) {
-        Logger::instance().warning(QString("Failed to switch camera subscription to topic: %1").arg(topic));
+        Logger::instance().warning(QString("Failed to subscribe camera topic: %1").arg(topic));
     }
 #else
-    Logger::instance().debug(QString("Camera topic switch (stub): %1").arg(topic));
+    Logger::instance().debug(QString("Camera topic subscribe (stub): %1").arg(topic));
+#endif
+}
+
+void ROS2Interface::unsubscribeCameraTopic()
+{
+#ifdef USE_ROS2
+    if (m_imageSubscriber) {
+        m_imageSubscriber.reset();
+        Logger::instance().info("Camera subscription disabled (on-demand mode)");
+    }
+#else
+    Logger::instance().debug("Camera topic unsubscribe (stub)");
 #endif
 }
 
@@ -287,11 +304,41 @@ void ROS2Interface::publishRobotCommand(const QString& command)
 #ifdef USE_ROS2
 void ROS2Interface::imageCallback(const RawImageMsg::SharedPtr msg)
 {
-    // msg->format  = "gray4;160x120"  or  "gray8;160x120"
-    // msg->data    = packed bytes
-    
+    // Supported compressed formats:
+    //  1) Standard CompressedImage (jpeg/jpg/png) -> decoded via Qt
+    //  2) Custom packed grayscale "gray4;WxH" / "gray8;WxH"
+
     const QString format = QString::fromStdString(msg->format).trimmed();
-    
+    const QString formatLower = format.toLower();
+    const QByteArray raw(reinterpret_cast<const char*>(msg->data.data()),
+                         static_cast<int>(msg->data.size()));
+
+    if (formatLower == "jpeg" || formatLower == "jpg" || formatLower == "png") {
+        QImage decoded;
+        if (!decoded.loadFromData(raw)) {
+            Logger::instance().warning(
+                QString("Failed to decode CompressedImage payload as %1").arg(format));
+            return;
+        }
+
+        QImage rgb = decoded.convertToFormat(QImage::Format_RGB888);
+        if (rgb.isNull()) {
+            Logger::instance().warning("Failed to convert decoded compressed image to RGB888");
+            return;
+        }
+
+        QByteArray imageData(reinterpret_cast<const char*>(rgb.constBits()),
+                             rgb.width() * rgb.height() * 3);
+        emit imageReceived(imageData, rgb.width(), rgb.height());
+
+        Logger::instance().debug(
+            QString("Decoded %1 frame %2x%3")
+                .arg(formatLower)
+                .arg(rgb.width())
+                .arg(rgb.height()));
+        return;
+    }
+
     // ── Parse "gray4;WxH" or "gray8;WxH" ─────────────────────────────
     const QStringList parts = format.split(';');
     if (parts.size() != 2) {
@@ -318,8 +365,6 @@ void ROS2Interface::imageCallback(const RawImageMsg::SharedPtr msg)
     }
 
     const int totalPixels = width * height;
-    const QByteArray raw(reinterpret_cast<const char*>(msg->data.data()),
-                         static_cast<int>(msg->data.size()));
 
     QByteArray imageData; // will be filled as packed RGB888
 

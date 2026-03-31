@@ -47,6 +47,8 @@ public:
 
     // Subscription management
     void switchCameraTopic(const QString& topic);
+    void subscribeCameraTopic(const QString& topic);
+    void unsubscribeCameraTopic();
 
 signals:
     // Connection status
