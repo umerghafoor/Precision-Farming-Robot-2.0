@@ -5,6 +5,7 @@
 #include <QThread>
 #include <QByteArray>
 #include <QVariant>
+#include <QHash>
 #include <memory>
 
 #ifdef USE_ROS2
@@ -49,6 +50,7 @@ public:
     void switchCameraTopic(const QString& topic);
     void subscribeCameraTopic(const QString& topic);
     void unsubscribeCameraTopic();
+    void unsubscribeCameraTopic(const QString& topic);
 
 signals:
     // Connection status
@@ -58,6 +60,7 @@ signals:
 
     // Data received signals
     void imageReceived(const QByteArray& imageData, int width, int height);
+    void imageReceivedForTopic(const QString& topic, const QByteArray& imageData, int width, int height);
     void imuDataReceived(double ax, double ay, double az, 
                          double gx, double gy, double gz);
     void robotStatusReceived(const QString& status);
@@ -87,7 +90,7 @@ private:
     bool createImageSubscription(const QString& topic);
 
     // Callback methods
-    void imageCallback(const RawImageMsg::SharedPtr msg);
+    void imageCallback(const RawImageMsg::SharedPtr msg, const QString& sourceTopic);
     void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
     void statusCallback(const std_msgs::msg::String::SharedPtr msg);
     void coordinatesCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg);
@@ -101,7 +104,8 @@ private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr m_commandPublisher;
 
     // Subscribers
-    rclcpp::Subscription<RawImageMsg>::SharedPtr m_imageSubscriber;
+    QHash<QString, rclcpp::Subscription<RawImageMsg>::SharedPtr> m_imageSubscribers;
+    QHash<QString, int> m_imageTopicRefCounts;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr m_imuSubscriber;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_statusSubscriber;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr m_coordinatesSubscriber;

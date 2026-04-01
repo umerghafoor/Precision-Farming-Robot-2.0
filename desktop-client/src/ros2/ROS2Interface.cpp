@@ -58,10 +58,16 @@ bool ROS2Interface::createImageSubscription(const QString& topic)
         return false;
     }
 
-    m_imageSubscriber = m_node->create_subscription<RawImageMsg>(
+    if (m_imageSubscribers.contains(normalizedTopic)) {
+        return true;
+    }
+
+    m_imageSubscribers[normalizedTopic] = m_node->create_subscription<RawImageMsg>(
         normalizedTopic.toStdString(),
         createImageSubscriptionQos(),
-        std::bind(&ROS2Interface::imageCallback, this, std::placeholders::_1));
+        [this, normalizedTopic](const RawImageMsg::SharedPtr msg) {
+            imageCallback(msg, normalizedTopic);
+        });
 
     Logger::instance().info(QString("Camera subscription active on %1 (reliable=%2, depth=%3)")
                             .arg(normalizedTopic)
@@ -101,7 +107,7 @@ bool ROS2Interface::initialize()
                 170,
                 255
             };
-            imageCallback(fake);
+            imageCallback(fake, "/camera/color_jpeg");
             Logger::instance().info("IMAGE_PIPELINE_TEST: synthetic frame injected");
         }
 
@@ -176,13 +182,23 @@ void ROS2Interface::subscribeCameraTopic(const QString& topic)
         return;
     }
 
-    // Replace existing camera subscription with the requested topic.
-    if (m_imageSubscriber) {
-        m_imageSubscriber.reset();
-        Logger::instance().debug("Unsubscribed from previous camera topic");
+    const QString normalizedTopic = normalizeTopicName(topic);
+    if (normalizedTopic.isEmpty()) {
+        Logger::instance().warning("Cannot subscribe camera topic - empty topic name");
+        return;
     }
 
-    if (!createImageSubscription(topic)) {
+    int& refCount = m_imageTopicRefCounts[normalizedTopic];
+    refCount += 1;
+    if (refCount > 1) {
+        Logger::instance().debug(QString("Camera topic %1 already active (refCount=%2)")
+                                 .arg(normalizedTopic)
+                                 .arg(refCount));
+        return;
+    }
+
+    if (!createImageSubscription(normalizedTopic)) {
+        m_imageTopicRefCounts.remove(normalizedTopic);
         Logger::instance().warning(QString("Failed to subscribe camera topic: %1").arg(topic));
     }
 #else
@@ -193,12 +209,42 @@ void ROS2Interface::subscribeCameraTopic(const QString& topic)
 void ROS2Interface::unsubscribeCameraTopic()
 {
 #ifdef USE_ROS2
-    if (m_imageSubscriber) {
-        m_imageSubscriber.reset();
-        Logger::instance().info("Camera subscription disabled (on-demand mode)");
-    }
+    m_imageSubscribers.clear();
+    m_imageTopicRefCounts.clear();
+    Logger::instance().info("All camera subscriptions disabled (on-demand mode)");
 #else
     Logger::instance().debug("Camera topic unsubscribe (stub)");
+#endif
+}
+
+void ROS2Interface::unsubscribeCameraTopic(const QString& topic)
+{
+#ifdef USE_ROS2
+    const QString normalizedTopic = normalizeTopicName(topic);
+    if (normalizedTopic.isEmpty()) {
+        unsubscribeCameraTopic();
+        return;
+    }
+
+    auto it = m_imageTopicRefCounts.find(normalizedTopic);
+    if (it == m_imageTopicRefCounts.end()) {
+        Logger::instance().debug(QString("Camera topic %1 was not subscribed").arg(normalizedTopic));
+        return;
+    }
+
+    it.value() -= 1;
+    if (it.value() > 0) {
+        Logger::instance().debug(QString("Camera topic %1 kept active (refCount=%2)")
+                                 .arg(normalizedTopic)
+                                 .arg(it.value()));
+        return;
+    }
+
+    m_imageTopicRefCounts.erase(it);
+    m_imageSubscribers.remove(normalizedTopic);
+    Logger::instance().info(QString("Camera subscription disabled for %1").arg(normalizedTopic));
+#else
+    Logger::instance().debug(QString("Camera topic unsubscribe (stub): %1").arg(topic));
 #endif
 }
 
@@ -302,7 +348,7 @@ void ROS2Interface::publishRobotCommand(const QString& command)
 }
 
 #ifdef USE_ROS2
-void ROS2Interface::imageCallback(const RawImageMsg::SharedPtr msg)
+void ROS2Interface::imageCallback(const RawImageMsg::SharedPtr msg, const QString& sourceTopic)
 {
     // Supported compressed formats:
     //  1) Standard CompressedImage (jpeg/jpg/png) -> decoded via Qt
@@ -330,6 +376,7 @@ void ROS2Interface::imageCallback(const RawImageMsg::SharedPtr msg)
         QByteArray imageData(reinterpret_cast<const char*>(rgb.constBits()),
                              rgb.width() * rgb.height() * 3);
         emit imageReceived(imageData, rgb.width(), rgb.height());
+        emit imageReceivedForTopic(sourceTopic, imageData, rgb.width(), rgb.height());
 
         Logger::instance().debug(
             QString("Decoded %1 frame %2x%3")
@@ -434,6 +481,10 @@ void ROS2Interface::imageCallback(const RawImageMsg::SharedPtr msg)
     emit imageReceived(imageData,
                        static_cast<uint32_t>(width),
                        static_cast<uint32_t>(height));
+    emit imageReceivedForTopic(sourceTopic,
+                               imageData,
+                               static_cast<uint32_t>(width),
+                               static_cast<uint32_t>(height));
 
     Logger::instance().debug(
         QString("Image received: %1x%2, encoding: %3")

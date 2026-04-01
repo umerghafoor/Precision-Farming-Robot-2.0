@@ -111,7 +111,7 @@ void VideoStreamWidget::setupUI()
 bool VideoStreamWidget::initialize()
 {
     if (m_ros2Interface) {
-        connect(m_ros2Interface, &ROS2Interface::imageReceived,
+    connect(m_ros2Interface, &ROS2Interface::imageReceivedForTopic,
                 this, &VideoStreamWidget::onImageReceived);
         connect(m_ros2Interface, &ROS2Interface::robotStatusReceived,
                 this, &VideoStreamWidget::onRobotStatusUpdated);
@@ -123,8 +123,15 @@ bool VideoStreamWidget::initialize()
     return false;
 }
 
-void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, int height)
+void VideoStreamWidget::onImageReceived(const QString& topic, const QByteArray& imageData, int width, int height)
 {
+    const QString normalizedCurrentTopic = m_currentTopic.startsWith('/')
+        ? m_currentTopic
+        : QString("/") + m_currentTopic;
+    if (topic != normalizedCurrentTopic) {
+        return;
+    }
+
     // The ROS2Interface ensures any BGR8 frames are converted to RGB8 before
     // emitting imageReceived. We therefore treat the incoming QByteArray as
     // RGB data; any unsupported encodings are logged by the interface.
@@ -165,6 +172,8 @@ void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, 
 
 void VideoStreamWidget::onStreamTabChanged(int index)
 {
+    const QString previousTopic = m_currentTopic;
+
     QString selectedTopic;
     switch (index) {
         case 0: selectedTopic = "camera/color_jpeg"; break;
@@ -187,6 +196,9 @@ void VideoStreamWidget::onStreamTabChanged(int index)
     showPlaceholder();
 
     if (m_ros2Interface && isVisible()) {
+        if (previousTopic != selectedTopic) {
+            m_ros2Interface->unsubscribeCameraTopic(previousTopic);
+        }
         m_ros2Interface->subscribeCameraTopic(selectedTopic);
     } else {
         Logger::instance().debug(QString("Deferred camera subscribe for topic %1 (widget not visible or ROS2 missing)")
@@ -270,6 +282,6 @@ void VideoStreamWidget::hideEvent(QHideEvent *event)
     BaseWidget::hideEvent(event);
 
     if (m_ros2Interface) {
-        m_ros2Interface->unsubscribeCameraTopic();
+        m_ros2Interface->unsubscribeCameraTopic(m_currentTopic);
     }
 }
