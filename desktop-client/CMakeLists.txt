@@ -96,6 +96,7 @@ set(SOURCES
     src/ui/widgets/TwinVisualizationWidget.cpp
     src/ui/widgets/RobotMapView.cpp
     src/ui/widgets/StatusBadge.cpp
+    src/ui/widgets/ZoomableImageView.cpp
     src/ui/widgets/RobotModelWidget.cpp
     src/rendering/OBJLoader.cpp
     src/rendering/ModelGLView.cpp
@@ -122,6 +123,7 @@ set(HEADERS
     src/ui/widgets/TwinVisualizationWidget.h
     src/ui/widgets/RobotMapView.h
     src/ui/widgets/StatusBadge.h
+    src/ui/widgets/ZoomableImageView.h
     src/ui/widgets/RobotModelWidget.h
     src/rendering/OBJMesh.h
     src/rendering/OBJLoader.h

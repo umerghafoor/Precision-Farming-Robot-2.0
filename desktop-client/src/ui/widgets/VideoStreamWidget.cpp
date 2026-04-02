@@ -1,4 +1,5 @@
 #include "VideoStreamWidget.h"
+#include "ZoomableImageView.h"
 #include "ROS2Interface.h"
 #include "Logger.h"
 #include <QVBoxLayout>
@@ -9,6 +10,7 @@
 #include <QFrame>
 #include <QPainter>
 #include <QStyleOption>
+#include <QLabel>
 
 VideoStreamWidget::VideoStreamWidget(QWidget *parent)
     : BaseWidget(parent)
@@ -25,9 +27,16 @@ VideoStreamWidget::~VideoStreamWidget()
 void VideoStreamWidget::setupUI()
 {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setSpacing(6);
+
+    QWidget* headerRow = new QWidget(this);
+    QHBoxLayout* headerLayout = new QHBoxLayout(headerRow);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+    headerLayout->setSpacing(6);
 
     // Tab bar for stream sources
-    m_tabBar = new QTabBar();
+    m_tabBar = new QTabBar(headerRow);
     // start timer used for fps calculations
     m_frameTimer.start();
     m_tabBar->addTab("Raw");
@@ -36,6 +45,30 @@ void VideoStreamWidget::setupUI()
     m_currentTopic = "camera/raw";
     connect(m_tabBar, &QTabBar::currentChanged,
             this, &VideoStreamWidget::onStreamTabChanged);
+
+    QWidget* zoomControls = new QWidget(headerRow);
+    QHBoxLayout* zoomLayout = new QHBoxLayout(zoomControls);
+    zoomLayout->setContentsMargins(0, 0, 0, 0);
+    zoomLayout->setSpacing(4);
+
+    m_zoomOutButton = new QPushButton("-");
+    m_zoomOutButton->setFixedWidth(32);
+    m_zoomOutButton->setToolTip("Zoom out");
+    connect(m_zoomOutButton, &QPushButton::clicked,
+        this, &VideoStreamWidget::onZoomOutClicked);
+
+    m_zoomInButton = new QPushButton("+");
+    m_zoomInButton->setFixedWidth(32);
+    m_zoomInButton->setToolTip("Zoom in");
+    connect(m_zoomInButton, &QPushButton::clicked,
+        this, &VideoStreamWidget::onZoomInClicked);
+
+    zoomLayout->addWidget(m_zoomOutButton);
+    zoomLayout->addWidget(m_zoomInButton);
+    zoomLayout->addStretch(1);
+
+    headerLayout->addWidget(m_tabBar, 1);
+    headerLayout->addWidget(zoomControls, 0, Qt::AlignRight);
 
     // make a container that will hold video and overlays
     m_videoContainer = new QFrame();
@@ -46,11 +79,7 @@ void VideoStreamWidget::setupUI()
     QVBoxLayout* containerLayout = new QVBoxLayout(m_videoContainer);
     containerLayout->setContentsMargins(0,0,0,0);
 
-    m_videoLabel = new QLabel();
-    m_videoLabel->setAlignment(Qt::AlignCenter);
-    m_videoLabel->setStyleSheet("QLabel { background-color: black; }");
-    m_videoLabel->setScaledContents(false);
-    m_videoLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_videoLabel = new ZoomableImageView();
     containerLayout->addWidget(m_videoLabel);
 
     // overlays
@@ -94,7 +123,7 @@ void VideoStreamWidget::setupUI()
     // placeholder initial state
     showPlaceholder();
 
-    mainLayout->addWidget(m_tabBar);
+    mainLayout->addWidget(headerRow);
     mainLayout->addWidget(m_videoContainer, 1);
 
     // ensure initial topic state is set
@@ -191,6 +220,20 @@ void VideoStreamWidget::onStreamTabChanged(int index)
     }
 }
 
+void VideoStreamWidget::onZoomInClicked()
+{
+    if (m_videoLabel) {
+        m_videoLabel->zoomIn();
+    }
+}
+
+void VideoStreamWidget::onZoomOutClicked()
+{
+    if (m_videoLabel) {
+        m_videoLabel->zoomOut();
+    }
+}
+
 void VideoStreamWidget::onToggleRecording()
 {
     // kept for backward compatibility but not used in P6
@@ -211,18 +254,10 @@ void VideoStreamWidget::onRobotStatusUpdated(const QString& status)
 
 void VideoStreamWidget::showPlaceholder()
 {
-    // create a simple grey pixmap with text
-    QSize sz = m_videoLabel->size().boundedTo(QSize(640,480));
-    if (sz.isEmpty()) sz = QSize(640,480);
-    QPixmap placeholder(sz);
-    placeholder.fill(Qt::darkGray);
-    QPainter p(&placeholder);
-    p.setPen(Qt::white);
-    p.setFont(QFont("Arial", 20, QFont::Bold));
-    p.drawText(placeholder.rect(), Qt::AlignCenter, "No Stream");
-    p.end();
-
-    m_videoLabel->setPixmap(placeholder);
+    if (m_videoLabel) {
+        m_videoLabel->resetView();
+        m_videoLabel->setPixmap(QPixmap());
+    }
 }
 
 void VideoStreamWidget::updateOverlayInfo(int width, int height)

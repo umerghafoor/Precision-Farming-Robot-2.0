@@ -73,7 +73,7 @@ DOCKER_ARGS=(
   -e ROS_DOMAIN_ID="$ROS_DOMAIN_ID"
   -v /tmp/.X11-unix:/tmp/.X11-unix
   -v "$HOME/.Xauthority:/root/.Xauthority"
-  -v "/home/umerghafoor/Github/Precision-Farming-Robot-2.0:/workspace"
+  -v "/home/sani/c0d3/Precision-Farming-Robot-2.0/desktop-client:/workspace"
 )
 
 echo -e "${GREEN}Using CycloneDDS config: ${HOST_CYCLONEDDS_CONFIG}${NC}"
