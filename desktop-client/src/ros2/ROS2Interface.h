@@ -68,6 +68,7 @@ signals:
     void sensorDataReceived(const QString& sensorType, const QVariantMap& data);
     void coordinatesReceived(double x, double y);
     void coordinatesJsonReceived(const QString& data);
+    void detectionResultsReceived(const QString& data);
 
     // Emitted whenever a velocity command is sent (linear_x, angular_z)
     // Used by the digital twin to simulate motion without real robot feedback
