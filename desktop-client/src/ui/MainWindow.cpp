@@ -74,6 +74,8 @@ void MainWindow::createMenus()
     // widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
     // widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
+    widgetsMenu->addAction(tr("Add Current &Detection"), this, &MainWindow::onAddCurrentDetection);
+    widgetsMenu->addAction(tr("Add Detection &Summary"), this, &MainWindow::onAddDetectionSummary);
     widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
     widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
     widgetsMenu->addAction(tr("Add &Robot 3D Model"), this, &MainWindow::onAddRobotModel);
@@ -173,6 +175,8 @@ void MainWindow::createDefaultLayout()
     // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
     onAddSidebar();          // right sidebar unified control panel
     onAddSensorData();       // bottom telemetry bar
+    onAddCurrentDetection(); // right column detection details
+    onAddDetectionSummary(); // right column cumulative metrics
 
     // Enforce proportions: video should be ~3× wider than sidebar
     if (m_dockWidgets.contains("Video Stream") && m_dockWidgets.contains("Controls")) {
@@ -253,6 +257,22 @@ void MainWindow::addWidgetToDock(BaseWidget* widget, const QString& title)
                 break;
             }
         }
+    } else if (title.contains("Current Detection", Qt::CaseInsensitive)) {
+        area = Qt::RightDockWidgetArea;
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.value() && it.value()->windowTitle().contains("Sensor Data", Qt::CaseInsensitive)) {
+                splitWith = it.value();
+                break;
+            }
+        }
+    } else if (title.contains("Detection Summary", Qt::CaseInsensitive)) {
+        area = Qt::RightDockWidgetArea;
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
+            if (it.value() && it.value()->windowTitle().contains("Current Detection", Qt::CaseInsensitive)) {
+                splitWith = it.value();
+                break;
+            }
+        }
     }
     
     addDockWidget(area, dock);
@@ -323,6 +343,22 @@ void MainWindow::onAddCoordinates()
 
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::Coordinates, this);
     addWidgetToDock(widget, "Coordinates");
+}
+
+void MainWindow::onAddCurrentDetection()
+{
+    if (!m_widgetManager) return;
+
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::CurrentDetection, this);
+    addWidgetToDock(widget, "Current Detection");
+}
+
+void MainWindow::onAddDetectionSummary()
+{
+    if (!m_widgetManager) return;
+
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::DetectionSummary, this);
+    addWidgetToDock(widget, "Detection Summary");
 }
 
 

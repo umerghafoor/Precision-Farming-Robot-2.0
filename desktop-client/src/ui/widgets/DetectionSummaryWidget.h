@@ -2,8 +2,9 @@
 #define DETECTIONSUMMARYWIDGET_H
 
 #include "BaseWidget.h"
+#include <QHash>
 
-#include <QLabel>
+class QLabel;
 
 class DetectionSummaryWidget : public BaseWidget
 {
@@ -21,13 +22,19 @@ private slots:
 
 private:
     void setupUI();
+    void updateLabels();
 
-    QLabel* m_totalDetectionsLabel;
-    QLabel* m_uniqueClassesLabel;
-    QLabel* m_averageConfidenceLabel;
-    QLabel* m_minConfidenceLabel;
-    QLabel* m_maxConfidenceLabel;
-    QLabel* m_lastUpdatedLabel;
+    int m_totalDetections;
+    int m_framesWithResults;
+    int m_lastFrameCount;
+    QHash<QString, int> m_classCounts;
+
+    QLabel* m_totalDetectionsValue;
+    QLabel* m_framesValue;
+    QLabel* m_averagePerFrameValue;
+    QLabel* m_uniqueClassesValue;
+    QLabel* m_topClassValue;
+    QLabel* m_lastFrameCountValue;
 };
 
 #endif // DETECTIONSUMMARYWIDGET_H

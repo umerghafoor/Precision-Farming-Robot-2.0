@@ -93,6 +93,8 @@ set(SOURCES
     src/ui/widgets/SidebarWidget.cpp
     src/ui/widgets/SensorDataWidget.cpp
     src/ui/widgets/CoordinatesWidget.cpp
+    src/ui/widgets/CurrentDetectionWidget.cpp
+    src/ui/widgets/DetectionSummaryWidget.cpp
     src/ui/widgets/TwinVisualizationWidget.cpp
     src/ui/widgets/RobotMapView.cpp
     src/ui/widgets/StatusBadge.cpp
@@ -120,6 +122,8 @@ set(HEADERS
     src/ui/widgets/SidebarWidget.h
     src/ui/widgets/SensorDataWidget.h
     src/ui/widgets/CoordinatesWidget.h
+    src/ui/widgets/CurrentDetectionWidget.h
+    src/ui/widgets/DetectionSummaryWidget.h
     src/ui/widgets/TwinVisualizationWidget.h
     src/ui/widgets/RobotMapView.h
     src/ui/widgets/StatusBadge.h

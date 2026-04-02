@@ -3,111 +3,115 @@
 #include "Logger.h"
 
 #include <QVBoxLayout>
+#include <QGridLayout>
+#include <QLabel>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QDateTime>
-#include <QSet>
 
 DetectionSummaryWidget::DetectionSummaryWidget(QWidget *parent)
     : BaseWidget(parent)
+    , m_totalDetections(0)
+    , m_framesWithResults(0)
+    , m_lastFrameCount(0)
 {
     setupUI();
+    updateLabels();
 }
 
-DetectionSummaryWidget::~DetectionSummaryWidget() = default;
+DetectionSummaryWidget::~DetectionSummaryWidget()
+{
+}
 
 void DetectionSummaryWidget::setupUI()
 {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(10, 10, 10, 10);
-    mainLayout->setSpacing(8);
+    mainLayout->setContentsMargins(12, 12, 12, 12);
+    mainLayout->setSpacing(10);
 
-    m_totalDetectionsLabel = new QLabel("Total Detections: 0", this);
-    m_uniqueClassesLabel = new QLabel("Unique Classes: 0", this);
-    m_averageConfidenceLabel = new QLabel("Average Confidence: 0.00", this);
-    m_minConfidenceLabel = new QLabel("Min Confidence: 0.00", this);
-    m_maxConfidenceLabel = new QLabel("Max Confidence: 0.00", this);
-    m_lastUpdatedLabel = new QLabel("Last update: -", this);
+    QGridLayout* grid = new QGridLayout();
+    grid->setHorizontalSpacing(10);
+    grid->setVerticalSpacing(8);
 
-    m_totalDetectionsLabel->setStyleSheet("font-size: 12pt; font-weight: bold;");
-    m_uniqueClassesLabel->setStyleSheet("font-size: 11pt;");
+    auto addRow = [grid](int row, const QString& labelText, QLabel*& valueLabel) {
+        QLabel* label = new QLabel(labelText);
+        label->setStyleSheet("font-weight: 600;");
+        valueLabel = new QLabel("0");
+        valueLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
-    mainLayout->addWidget(m_totalDetectionsLabel);
-    mainLayout->addWidget(m_uniqueClassesLabel);
-    mainLayout->addWidget(m_averageConfidenceLabel);
-    mainLayout->addWidget(m_minConfidenceLabel);
-    mainLayout->addWidget(m_maxConfidenceLabel);
-    mainLayout->addWidget(m_lastUpdatedLabel);
-    mainLayout->addStretch();
+        grid->addWidget(label, row, 0, Qt::AlignTop);
+        grid->addWidget(valueLabel, row, 1);
+    };
+
+    addRow(0, "Total Detections:", m_totalDetectionsValue);
+    addRow(1, "Frames Processed:", m_framesValue);
+    addRow(2, "Avg / Frame:", m_averagePerFrameValue);
+    addRow(3, "Unique Classes:", m_uniqueClassesValue);
+    addRow(4, "Top Class:", m_topClassValue);
+    addRow(5, "Current Frame Count:", m_lastFrameCountValue);
+
+    grid->setColumnStretch(1, 1);
+
+    mainLayout->addLayout(grid);
+    mainLayout->addStretch(1);
+
+    setMinimumSize(320, 220);
 }
 
 bool DetectionSummaryWidget::initialize()
 {
-    if (!m_ros2Interface) {
-        Logger::instance().warning("DetectionSummaryWidget initialized without ROS2");
-        return false;
+    if (m_ros2Interface) {
+        connect(m_ros2Interface, &ROS2Interface::detectionResultsReceived,
+                this, &DetectionSummaryWidget::onDetectionResultsReceived);
+        Logger::instance().info("Detection summary widget initialized");
+        return true;
     }
 
-    connect(m_ros2Interface, &ROS2Interface::detectionResultsReceived,
-            this, &DetectionSummaryWidget::onDetectionResultsReceived);
-
-    Logger::instance().info("DetectionSummaryWidget initialized");
-    return true;
+    Logger::instance().warning("Detection summary widget initialized without ROS2");
+    return false;
 }
 
 void DetectionSummaryWidget::onDetectionResultsReceived(const QString& data)
 {
-    QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());
-    if (doc.isNull() || !doc.isObject()) {
-        Logger::instance().warning("DetectionSummaryWidget: invalid detection JSON");
+    const QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());
+    if (!doc.isObject()) {
+        Logger::instance().warning("DetectionSummaryWidget: invalid detection JSON payload");
         return;
     }
 
-    QJsonObject obj = doc.object();
-    QJsonArray detections = obj.value("detections").toArray();
-    int total = detections.size();
+    const QJsonArray detections = doc.object().value("detections").toArray();
+    m_lastFrameCount = detections.size();
+    m_totalDetections += m_lastFrameCount;
+    m_framesWithResults += 1;
 
-    QSet<QString> unique;
-    double minConf = 1.0;
-    double maxConf = 0.0;
-    double sumConf = 0.0;
-    int confCount = 0;
+    for (const QJsonValue& detectionValue : detections) {
+        const QString className = detectionValue.toObject().value("class").toString("Unknown");
+        m_classCounts[className] = m_classCounts.value(className, 0) + 1;
+    }
 
-    for (const QJsonValue& entry : detections) {
-        if (!entry.isObject()) continue;
+    updateLabels();
+}
 
-        QJsonObject det = entry.toObject();
-        QString className = det.value("class").toString(det.value("class_id").toVariant().toString());
+void DetectionSummaryWidget::updateLabels()
+{
+    m_totalDetectionsValue->setText(QString::number(m_totalDetections));
+    m_framesValue->setText(QString::number(m_framesWithResults));
+    m_lastFrameCountValue->setText(QString::number(m_lastFrameCount));
+    m_uniqueClassesValue->setText(QString::number(m_classCounts.size()));
 
-        unique.insert(className);
+    const double average = m_framesWithResults > 0
+        ? static_cast<double>(m_totalDetections) / static_cast<double>(m_framesWithResults)
+        : 0.0;
+    m_averagePerFrameValue->setText(QString::number(average, 'f', 2));
 
-        if (det.contains("confidence")) {
-            double conf = det.value("confidence").toDouble(-1.0);
-            if (conf >= 0.0) {
-                sumConf += conf;
-                confCount += 1;
-                minConf = qMin(minConf, conf);
-                maxConf = qMax(maxConf, conf);
-            }
+    QString topClass = "-";
+    int topCount = -1;
+    for (auto it = m_classCounts.constBegin(); it != m_classCounts.constEnd(); ++it) {
+        if (it.value() > topCount) {
+            topClass = QString("%1 (%2)").arg(it.key()).arg(it.value());
+            topCount = it.value();
         }
     }
 
-    double avgConf = (confCount > 0) ? (sumConf / confCount) : 0.0;
-    if (confCount == 0) {
-        minConf = 0.0;
-        maxConf = 0.0;
-    }
-
-    m_totalDetectionsLabel->setText(QString("Total Detections: %1").arg(total));
-    m_uniqueClassesLabel->setText(QString("Unique Classes: %1").arg(unique.size()));
-    m_averageConfidenceLabel->setText(QString("Average Confidence: %1").arg(avgConf, 0, 'f', 3));
-    m_minConfidenceLabel->setText(QString("Min Confidence: %1").arg(minConf, 0, 'f', 3));
-    m_maxConfidenceLabel->setText(QString("Max Confidence: %1").arg(maxConf, 0, 'f', 3));
-    m_lastUpdatedLabel->setText(QString("Last update: %1").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
-
-    Logger::instance().debug(QString("DetectionSummaryWidget updated: total=%1 unique=%2 avg=%3")
-                             .arg(total)
-                             .arg(unique.size())
-                             .arg(avgConf, 0, 'f', 3));
+    m_topClassValue->setText(topClass);
 }

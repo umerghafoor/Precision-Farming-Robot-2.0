@@ -3,115 +3,128 @@
 #include "Logger.h"
 
 #include <QVBoxLayout>
+#include <QGridLayout>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QDateTime>
 
 CurrentDetectionWidget::CurrentDetectionWidget(QWidget *parent)
     : BaseWidget(parent)
 {
     setupUI();
+    setNoDetectionState();
 }
 
-CurrentDetectionWidget::~CurrentDetectionWidget() = default;
+CurrentDetectionWidget::~CurrentDetectionWidget()
+{
+}
 
 void CurrentDetectionWidget::setupUI()
 {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(10, 10, 10, 10);
-    mainLayout->setSpacing(8);
+    mainLayout->setContentsMargins(12, 12, 12, 12);
+    mainLayout->setSpacing(10);
 
-    m_countLabel = new QLabel("Detections in frame: 0", this);
-    m_currentIndexLabel = new QLabel("Current detection index: -", this);
-    m_classLabel = new QLabel("Class: -", this);
-    m_classIdLabel = new QLabel("Class ID: -", this);
-    m_confidenceLabel = new QLabel("Confidence: -", this);
-    m_bboxLabel = new QLabel("Bbox: -", this);
+    QGridLayout* grid = new QGridLayout();
+    grid->setHorizontalSpacing(10);
+    grid->setVerticalSpacing(8);
 
-    m_countLabel->setStyleSheet("font-size: 12pt; font-weight: bold;");
+    auto addRow = [grid](int row, const QString& labelText, QLabel*& valueLabel) {
+        QLabel* label = new QLabel(labelText);
+        label->setStyleSheet("font-weight: 600;");
+        valueLabel = new QLabel("-");
+        valueLabel->setWordWrap(true);
+        valueLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
-    mainLayout->addWidget(m_countLabel);
-    mainLayout->addWidget(m_currentIndexLabel);
-    mainLayout->addWidget(m_classLabel);
-    mainLayout->addWidget(m_classIdLabel);
-    mainLayout->addWidget(m_confidenceLabel);
-    mainLayout->addWidget(m_bboxLabel);
-    mainLayout->addStretch();
+        grid->addWidget(label, row, 0, Qt::AlignTop);
+        grid->addWidget(valueLabel, row, 1);
+    };
+
+    addRow(0, "Detections in View:", m_frameDetectionsValue);
+    addRow(1, "Class:", m_classValue);
+    addRow(2, "Class ID:", m_classIdValue);
+    addRow(3, "Confidence:", m_confidenceValue);
+    addRow(4, "BBox:", m_bboxValue);
+    addRow(5, "Last Updated:", m_lastUpdatedValue);
+
+    grid->setColumnStretch(1, 1);
+
+    mainLayout->addLayout(grid);
+    mainLayout->addStretch(1);
+
+    setMinimumSize(320, 220);
 }
 
 bool CurrentDetectionWidget::initialize()
 {
-    if (!m_ros2Interface) {
-        Logger::instance().warning("CurrentDetectionWidget initialized without ROS2");
-        return false;
+    if (m_ros2Interface) {
+        connect(m_ros2Interface, &ROS2Interface::detectionResultsReceived,
+                this, &CurrentDetectionWidget::onDetectionResultsReceived);
+        Logger::instance().info("Current detection widget initialized");
+        return true;
     }
 
-    connect(m_ros2Interface, &ROS2Interface::detectionResultsReceived,
-            this, &CurrentDetectionWidget::onDetectionResultsReceived);
+    Logger::instance().warning("Current detection widget initialized without ROS2");
+    return false;
+}
 
-    Logger::instance().info("CurrentDetectionWidget initialized");
-    return true;
+void CurrentDetectionWidget::setNoDetectionState()
+{
+    m_frameDetectionsValue->setText("0");
+    m_classValue->setText("None");
+    m_classIdValue->setText("-");
+    m_confidenceValue->setText("-");
+    m_bboxValue->setText("-");
+    m_lastUpdatedValue->setText("Waiting for /detections/results");
 }
 
 void CurrentDetectionWidget::onDetectionResultsReceived(const QString& data)
 {
-    QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());
-    if (doc.isNull() || !doc.isObject()) {
-        Logger::instance().warning("CurrentDetectionWidget: invalid detection JSON");
+    const QJsonDocument doc = QJsonDocument::fromJson(data.toUtf8());
+    if (!doc.isObject()) {
+        Logger::instance().warning("CurrentDetectionWidget: invalid detection JSON payload");
         return;
     }
 
-    QJsonObject obj = doc.object();
-    QJsonArray detections = obj.value("detections").toArray();
-    int total = detections.size();
+    const QJsonObject root = doc.object();
+    const QJsonArray detections = root.value("detections").toArray();
+    m_frameDetectionsValue->setText(QString::number(detections.size()));
 
-    m_countLabel->setText(QString("Detections in frame: %1").arg(total));
-
-    if (total == 0) {
-        m_currentIndexLabel->setText("Current detection index: -");
-        m_classLabel->setText("Class: -");
-        m_classIdLabel->setText("Class ID: -");
-        m_confidenceLabel->setText("Confidence: -");
-        m_bboxLabel->setText("Bbox: -");
+    if (detections.isEmpty()) {
+        setNoDetectionState();
+        m_lastUpdatedValue->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
         return;
     }
 
-    int bestIndex = 0;
-    double bestConfidence = -1.0;
+    QJsonObject bestDetection = detections.first().toObject();
+    double bestConfidence = bestDetection.value("confidence").toDouble(0.0);
 
-    for (int i = 0; i < total; ++i) {
-        QJsonValue val = detections[i];
-        if (!val.isObject()) continue;
-
-        QJsonObject det = val.toObject();
-        double conf = det.value("confidence").toDouble(-1.0);
-        if (conf > bestConfidence) {
-            bestConfidence = conf;
-            bestIndex = i;
+    for (const QJsonValue& detectionValue : detections) {
+        const QJsonObject candidate = detectionValue.toObject();
+        const double confidence = candidate.value("confidence").toDouble(0.0);
+        if (confidence > bestConfidence) {
+            bestConfidence = confidence;
+            bestDetection = candidate;
         }
     }
 
-    QJsonObject best = detections.at(bestIndex).toObject();
-    QString className = best.value("class").toString("-");
-    int classId = best.value("class_id").toInt(-1);
-    QString confidence = QString::number(bestConfidence, 'f', 3);
+    const QString className = bestDetection.value("class").toString("Unknown");
+    const int classId = bestDetection.value("class_id").toInt(-1);
 
     QString bboxText = "-";
-    if (best.contains("bbox") && best.value("bbox").isArray()) {
-        QJsonArray bbox = best.value("bbox").toArray();
-        QStringList parts;
-        for (int j = 0; j < bbox.size(); ++j) {
-            parts << QString::number(bbox[j].toDouble(0.0), 'f', 3);
-        }
-        bboxText = parts.join(", ");
+    const QJsonArray bbox = bestDetection.value("bbox").toArray();
+    if (bbox.size() >= 4) {
+        bboxText = QString("x=%1, y=%2, w=%3, h=%4")
+                       .arg(bbox.at(0).toDouble(0.0), 0, 'f', 1)
+                       .arg(bbox.at(1).toDouble(0.0), 0, 'f', 1)
+                       .arg(bbox.at(2).toDouble(0.0), 0, 'f', 1)
+                       .arg(bbox.at(3).toDouble(0.0), 0, 'f', 1);
     }
 
-    m_currentIndexLabel->setText(QString("Current detection index: %1").arg(bestIndex));
-    m_classLabel->setText(QString("Class: %1").arg(className));
-    m_classIdLabel->setText(QString("Class ID: %1").arg(classId));
-    m_confidenceLabel->setText(QString("Confidence: %1").arg(confidence));
-    m_bboxLabel->setText(QString("Bbox: [%1]").arg(bboxText));
-
-    Logger::instance().debug(QString("CurrentDetectionWidget updated: index=%1 class=%2 conf=%3")
-                             .arg(bestIndex).arg(className).arg(confidence));
+    m_classValue->setText(className);
+    m_classIdValue->setText(classId >= 0 ? QString::number(classId) : "-");
+    m_confidenceValue->setText(QString::number(bestConfidence * 100.0, 'f', 1) + "%");
+    m_bboxValue->setText(bboxText);
+    m_lastUpdatedValue->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
 }

@@ -2,7 +2,6 @@
 #define CURRENTDETECTIONWIDGET_H
 
 #include "BaseWidget.h"
-
 #include <QLabel>
 
 class CurrentDetectionWidget : public BaseWidget
@@ -21,13 +20,14 @@ private slots:
 
 private:
     void setupUI();
+    void setNoDetectionState();
 
-    QLabel* m_currentIndexLabel;
-    QLabel* m_classLabel;
-    QLabel* m_classIdLabel;
-    QLabel* m_confidenceLabel;
-    QLabel* m_bboxLabel;
-    QLabel* m_countLabel;
+    QLabel* m_frameDetectionsValue;
+    QLabel* m_classValue;
+    QLabel* m_classIdValue;
+    QLabel* m_confidenceValue;
+    QLabel* m_bboxValue;
+    QLabel* m_lastUpdatedValue;
 };
 
 #endif // CURRENTDETECTIONWIDGET_H
