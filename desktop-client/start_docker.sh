@@ -71,10 +71,22 @@ DOCKER_ARGS=(
   --network host
   -e DISPLAY="$DISPLAY"
   -e ROS_DOMAIN_ID="$ROS_DOMAIN_ID"
+  -e QT_QPA_PLATFORM=xcb
+  -e QT_DEBUG_PLUGINS=0
   -v /tmp/.X11-unix:/tmp/.X11-unix
   -v "$HOME/.Xauthority:/root/.Xauthority"
+  -v "/dev/dri:/dev/dri"
   -v "/home/sani/c0d3/Precision-Farming-Robot-2.0/desktop-client:/workspace"
 )
+
+# Try to enable GPU support if nvidia-docker is available
+if command -v nvidia-docker &> /dev/null; then
+    echo -e "${YELLOW}nvidia-docker detected, enabling GPU support...${NC}"
+    DOCKER_CMD="sudo nvidia-docker"
+else
+    DOCKER_CMD="sudo docker"
+    echo -e "${YELLOW}Using software rendering (no GPU detected)${NC}"
+fi
 
 echo -e "${GREEN}Using CycloneDDS config: ${HOST_CYCLONEDDS_CONFIG}${NC}"
 DOCKER_ARGS+=(
@@ -84,13 +96,16 @@ DOCKER_ARGS+=(
 
 # Run the Docker container
 echo -e "${GREEN}Starting container...${NC}"
-sudo docker run "${DOCKER_ARGS[@]}" \
+$DOCKER_CMD run "${DOCKER_ARGS[@]}" \
   --name precision-farming-client \
   ros2-humble-qt6 \
   bash
 
 # Cleanup X11 access after container exits
 echo -e "${GREEN}Cleaning up X11 access...${NC}"
+xhost -local:root > /dev/null 2>&1
+
+echo -e "${GREEN}Container stopped.${NC}"
 xhost -local:root > /dev/null 2>&1
 
 echo -e "${GREEN}Container stopped.${NC}"
