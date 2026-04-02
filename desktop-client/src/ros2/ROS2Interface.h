@@ -6,6 +6,7 @@
 #include <QByteArray>
 #include <QVariant>
 #include <QHash>
+#include <QMutex>
 #include <memory>
 
 #ifdef USE_ROS2
@@ -104,6 +105,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr m_commandPublisher;
 
     // Subscribers
+    mutable QMutex m_imageSubscriptionMutex;
     QHash<QString, rclcpp::Subscription<RawImageMsg>::SharedPtr> m_imageSubscribers;
     QHash<QString, int> m_imageTopicRefCounts;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr m_imuSubscriber;

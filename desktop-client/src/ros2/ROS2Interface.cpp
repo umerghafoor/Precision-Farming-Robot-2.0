@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include <QImage>
 #include <QTimer>
+#include <QMutexLocker>
 
 ROS2Interface::ROS2Interface(int argc, char** argv, QObject *parent)
     : QObject(parent)
@@ -188,6 +189,8 @@ void ROS2Interface::subscribeCameraTopic(const QString& topic)
         return;
     }
 
+    QMutexLocker locker(&m_imageSubscriptionMutex);
+
     int& refCount = m_imageTopicRefCounts[normalizedTopic];
     refCount += 1;
     if (refCount > 1) {
@@ -209,6 +212,7 @@ void ROS2Interface::subscribeCameraTopic(const QString& topic)
 void ROS2Interface::unsubscribeCameraTopic()
 {
 #ifdef USE_ROS2
+    QMutexLocker locker(&m_imageSubscriptionMutex);
     m_imageSubscribers.clear();
     m_imageTopicRefCounts.clear();
     Logger::instance().info("All camera subscriptions disabled (on-demand mode)");
@@ -225,6 +229,8 @@ void ROS2Interface::unsubscribeCameraTopic(const QString& topic)
         unsubscribeCameraTopic();
         return;
     }
+
+    QMutexLocker locker(&m_imageSubscriptionMutex);
 
     auto it = m_imageTopicRefCounts.find(normalizedTopic);
     if (it == m_imageTopicRefCounts.end()) {
@@ -266,7 +272,9 @@ void ROS2Interface::start()
     
     connect(m_ros2Thread.get(), &QThread::started, spinTimer, 
             static_cast<void (QTimer::*)()>(&QTimer::start));
-    connect(spinTimer, &QTimer::timeout, this, &ROS2Interface::spinROS2);
+    connect(spinTimer, &QTimer::timeout, spinTimer, [this]() {
+        spinROS2();
+    });
     connect(m_ros2Thread.get(), &QThread::finished, spinTimer, &QTimer::deleteLater);
     
     m_ros2Thread->start();
