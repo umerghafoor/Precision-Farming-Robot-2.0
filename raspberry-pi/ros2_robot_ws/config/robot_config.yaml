@@ -69,18 +69,37 @@ encoder_odometry:
 robot_controller:
   # Control loop rate
   control_loop_rate: 20.0      # Main control loop frequency (Hz)
-  
+
   # Safety parameters
   emergency_stop_enabled: true # Enable emergency stop feature
   min_battery_voltage: 7.0     # Minimum safe battery voltage (V)
   max_battery_voltage: 12.6    # Maximum battery voltage (V)
-  
+
   # Velocity limits (redundant safety checks)
   max_linear_velocity: 1.0     # Maximum forward/backward speed (m/s)
   max_angular_velocity: 2.0    # Maximum rotation speed (rad/s)
-  
+
   # Command timeout (stop if no command received for this duration)
   command_timeout: 1.0         # Timeout in seconds
+
+# YOLO Detection Parameters
+yolo_detection:
+  # Model configuration
+  model_path: "/home/umer/Precision-Farming-Robot-2.0/yolo26n.pt"               # Path to YOLO model file (.pt, .onnx, or custom format)
+                               # Leave empty to disable detection (only republish camera stream)
+
+  # Inference parameters
+  confidence_threshold: 0.5    # Minimum confidence for detections (0.0-1.0)
+  iou_threshold: 0.45          # IoU threshold for NMS (0.0-1.0)
+  input_size: 640              # YOLO input size (typically 640 for YOLOv8)
+
+  # Topic configuration
+  camera_topic: "/camera/raw"                    # Input camera topic
+  annotated_topic: "/detections/annotated"       # Output annotated image topic
+  results_topic: "/detections/results"           # Output detection results topic (JSON format)
+
+  # Visualization and debugging
+  enable_visualization: true   # Enable debug logging for detected objects
 
 # GPIO Pin Assignments
 gpio_pins:
@@ -120,6 +139,8 @@ topics:
   cmd_vel_filtered: "/cmd_vel_filtered" # Output: filtered commands
   imu_data: "/imu/data"               # Output: IMU sensor data
   camera_raw: "/camera/raw"           # Output: camera images
+  detections_annotated: "/detections/annotated"  # Output: annotated camera images with bounding boxes
+  detections_results: "/detections/results"      # Output: detection results as JSON
   odometry: "/odom"                   # Output: odometry data
   robot_status: "/robot_status"       # Output: robot status
 

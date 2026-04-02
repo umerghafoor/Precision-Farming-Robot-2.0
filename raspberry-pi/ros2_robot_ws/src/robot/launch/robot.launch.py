@@ -56,6 +56,24 @@ def generate_launch_description():
         ),
 
         Node(
+            package='yolo_detection',
+            executable='yolo_detection_node',
+            name='yolo_detection_node',
+            output='screen',
+            parameters=[
+                {'model_path': ''},  # Set model path in robot_config.yaml
+                {'confidence_threshold': 0.25},
+                {'iou_threshold': 0.45},
+                {'input_size': 640},
+                {'camera_topic': '/camera/raw'},
+                {'annotated_topic': '/camera/detection'},
+                {'results_topic': '/detections/results'},
+                {'enable_visualization': True},
+            ],
+            emulate_tty=True,
+        ),
+
+        Node(
             package='encoder_odometry',
             executable='encoder_node',
             name='encoder_node',
