@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-all}"
 VIDEO_DEVICE_ARG="${2:-}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-ros2}"
-VIDEO_DEVICE="${VIDEO_DEVICE:-/dev/video0}"
+VIDEO_DEVICE="${VIDEO_DEVICE:-/dev/video8}"
 SELECTED_VIDEO_DEVICE=""
 WEBCAM_DEVICE_INDEX="${WEBCAM_DEVICE_INDEX:-}"
 SELECTED_WEBCAM_DEVICE_INDEX=""
@@ -121,22 +121,24 @@ echo "Workspace: $SCRIPT_DIR"
 echo "Conda env: $CONDA_ENV_NAME"
 echo "Mode: $MODE"
 
-if ! resolve_video_device; then
-  exit 1
-fi
-echo "Video device: $SELECTED_VIDEO_DEVICE"
-
-if [[ -z "$WEBCAM_DEVICE_INDEX" ]]; then
-  if ! SELECTED_WEBCAM_DEVICE_INDEX="$(device_path_to_index "$SELECTED_VIDEO_DEVICE")"; then
-    echo "ERROR: Could not extract webcam index from $SELECTED_VIDEO_DEVICE"
-    echo "Set WEBCAM_DEVICE_INDEX explicitly (example: WEBCAM_DEVICE_INDEX=1)"
+if [[ "$MODE" == "webcam" ]]; then
+  if ! resolve_video_device; then
     exit 1
   fi
-else
-  SELECTED_WEBCAM_DEVICE_INDEX="$WEBCAM_DEVICE_INDEX"
-fi
+  echo "Video device: $SELECTED_VIDEO_DEVICE"
 
-echo "Webcam index: $SELECTED_WEBCAM_DEVICE_INDEX"
+  if [[ -z "$WEBCAM_DEVICE_INDEX" ]]; then
+    if ! SELECTED_WEBCAM_DEVICE_INDEX="$(device_path_to_index "$SELECTED_VIDEO_DEVICE")"; then
+      echo "ERROR: Could not extract webcam index from $SELECTED_VIDEO_DEVICE"
+      echo "Set WEBCAM_DEVICE_INDEX explicitly (example: WEBCAM_DEVICE_INDEX=1)"
+      exit 1
+    fi
+  else
+    SELECTED_WEBCAM_DEVICE_INDEX="$WEBCAM_DEVICE_INDEX"
+  fi
+
+  echo "Webcam index: $SELECTED_WEBCAM_DEVICE_INDEX"
+fi
 
 action_camera_only() {
   ros2 run camera_sensor camera_node
@@ -162,6 +164,10 @@ action_all_nodes() {
   wait
 }
 
+action_yolo_only() {
+  ros2 run yolo_detection yolo_detection_node
+}
+
 case "$MODE" in
   camera)
     echo "Starting camera node only..."
@@ -171,14 +177,19 @@ case "$MODE" in
     echo "Starting webcam node only..."
     action_webcam_only
     ;;
+  yolo)
+    echo "Starting YOLO node only..."
+    action_yolo_only
+    ;;
   all)
     action_all_nodes
     ;;
   *)
-    echo "Usage: ./start_node.sh [camera|webcam|all] [video_device]"
+    echo "Usage: ./start_node.sh [camera|webcam|yolo|all] [video_device]"
     echo "Examples:"
     echo "  ./start_node.sh camera"
     echo "  ./start_node.sh webcam"
+    echo "  ./start_node.sh yolo"
     echo "  ./start_node.sh webcam /dev/video1"
     echo "  VIDEO_DEVICE=/dev/video1 ./start_node.sh camera"
     echo "  VIDEO_DEVICE=/dev/video1 ./start_node.sh webcam"
