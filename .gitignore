@@ -20,3 +20,4 @@ build
 install
 log
 yolo26n.pt
+*.pyc
