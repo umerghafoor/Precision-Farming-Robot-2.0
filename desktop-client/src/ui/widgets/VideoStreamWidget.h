@@ -25,9 +25,11 @@ public:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private slots:
-    void onImageReceived(const QByteArray& imageData, int width, int height);
+    void onImageReceived(const QString& topic, const QByteArray& imageData, int width, int height);
     void onStreamTabChanged(int index);
     void onToggleRecording();
     void onRobotStatusUpdated(const QString& status);

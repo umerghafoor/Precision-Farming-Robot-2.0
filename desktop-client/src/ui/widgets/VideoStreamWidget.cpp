@@ -30,10 +30,11 @@ void VideoStreamWidget::setupUI()
     m_tabBar = new QTabBar();
     // start timer used for fps calculations
     m_frameTimer.start();
+    m_tabBar->addTab("Color JPEG");
     m_tabBar->addTab("Raw");
     m_tabBar->addTab("Detection");
     m_tabBar->addTab("Depth");
-    m_currentTopic = "camera/raw";
+    m_currentTopic = "camera/color_jpeg";
     connect(m_tabBar, &QTabBar::currentChanged,
             this, &VideoStreamWidget::onStreamTabChanged);
 
@@ -110,7 +111,7 @@ void VideoStreamWidget::setupUI()
 bool VideoStreamWidget::initialize()
 {
     if (m_ros2Interface) {
-        connect(m_ros2Interface, &ROS2Interface::imageReceived,
+    connect(m_ros2Interface, &ROS2Interface::imageReceivedForTopic,
                 this, &VideoStreamWidget::onImageReceived);
         connect(m_ros2Interface, &ROS2Interface::robotStatusReceived,
                 this, &VideoStreamWidget::onRobotStatusUpdated);
@@ -122,8 +123,15 @@ bool VideoStreamWidget::initialize()
     return false;
 }
 
-void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, int height)
+void VideoStreamWidget::onImageReceived(const QString& topic, const QByteArray& imageData, int width, int height)
 {
+    const QString normalizedCurrentTopic = m_currentTopic.startsWith('/')
+        ? m_currentTopic
+        : QString("/") + m_currentTopic;
+    if (topic != normalizedCurrentTopic) {
+        return;
+    }
+
     // The ROS2Interface ensures any BGR8 frames are converted to RGB8 before
     // emitting imageReceived. We therefore treat the incoming QByteArray as
     // RGB data; any unsupported encodings are logged by the interface.
@@ -164,11 +172,14 @@ void VideoStreamWidget::onImageReceived(const QByteArray& imageData, int width, 
 
 void VideoStreamWidget::onStreamTabChanged(int index)
 {
+    const QString previousTopic = m_currentTopic;
+
     QString selectedTopic;
     switch (index) {
-        case 0: selectedTopic = "camera/raw"; break;
-        case 1: selectedTopic = "camera/detection"; break;
-        case 2: selectedTopic = "camera/depth"; break;
+        case 0: selectedTopic = "camera/color_jpeg"; break;
+        case 1: selectedTopic = "camera/raw"; break;
+        case 2: selectedTopic = "camera/detection"; break;
+        case 3: selectedTopic = "camera/depth"; break;
         default:
             Logger::instance().warning(QString("Unknown stream tab index: %1").arg(index));
             return;
@@ -184,10 +195,14 @@ void VideoStreamWidget::onStreamTabChanged(int index)
     // show placeholder until new frames arrive
     showPlaceholder();
 
-    if (m_ros2Interface) {
-        m_ros2Interface->switchCameraTopic(selectedTopic);
+    if (m_ros2Interface && isVisible()) {
+        if (previousTopic != selectedTopic) {
+            m_ros2Interface->unsubscribeCameraTopic(previousTopic);
+        }
+        m_ros2Interface->subscribeCameraTopic(selectedTopic);
     } else {
-        Logger::instance().warning("Cannot switch camera topic - ROS2 interface not available");
+        Logger::instance().debug(QString("Deferred camera subscribe for topic %1 (widget not visible or ROS2 missing)")
+                                 .arg(selectedTopic));
     }
 }
 
@@ -250,5 +265,23 @@ void VideoStreamWidget::resizeEvent(QResizeEvent *event)
         m_resolutionOverlay->move(sz.width() - w - margin, margin);
         int h = m_statusOverlay->sizeHint().height();
         m_statusOverlay->move(margin, sz.height() - h - margin);
+    }
+}
+
+void VideoStreamWidget::showEvent(QShowEvent *event)
+{
+    BaseWidget::showEvent(event);
+
+    if (m_ros2Interface) {
+        m_ros2Interface->subscribeCameraTopic(m_currentTopic);
+    }
+}
+
+void VideoStreamWidget::hideEvent(QHideEvent *event)
+{
+    BaseWidget::hideEvent(event);
+
+    if (m_ros2Interface) {
+        m_ros2Interface->unsubscribeCameraTopic(m_currentTopic);
     }
 }
