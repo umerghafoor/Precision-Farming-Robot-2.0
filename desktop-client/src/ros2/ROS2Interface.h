@@ -68,6 +68,7 @@ signals:
     void sensorDataReceived(const QString& sensorType, const QVariantMap& data);
     void coordinatesReceived(double x, double y);
     void coordinatesJsonReceived(const QString& data);
+    void detectionResultsReceived(const QString& data);
 
     // Emitted whenever a velocity command is sent (linear_x, angular_z)
     // Used by the digital twin to simulate motion without real robot feedback
@@ -96,6 +97,7 @@ private:
     void statusCallback(const std_msgs::msg::String::SharedPtr msg);
     void coordinatesCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg);
     void coordinatesJsonCallback(const std_msgs::msg::String::SharedPtr msg);
+    void detectionResultsCallback(const std_msgs::msg::String::SharedPtr msg);
 
     std::shared_ptr<rclcpp::Node> m_node;
     std::unique_ptr<QThread> m_ros2Thread;
@@ -112,6 +114,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_statusSubscriber;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr m_coordinatesSubscriber;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_coordinatesJsonSubscriber;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr m_detectionResultsSubscriber;
 #else
     std::unique_ptr<QThread> m_ros2Thread;
 #endif

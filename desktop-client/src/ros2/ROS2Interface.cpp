@@ -166,6 +166,11 @@ void ROS2Interface::setupSubscribers()
         "image/coordinates", 10,
         std::bind(&ROS2Interface::coordinatesJsonCallback, this, std::placeholders::_1));
 
+    // Detection results subscriber
+    m_detectionResultsSubscriber = m_node->create_subscription<std_msgs::msg::String>(
+        "/detections/results", 10,
+        std::bind(&ROS2Interface::detectionResultsCallback, this, std::placeholders::_1));
+
     Logger::instance().debug("ROS2 subscribers created");
 #endif
 }
@@ -528,4 +533,14 @@ void ROS2Interface::coordinatesJsonCallback(const std_msgs::msg::String::SharedP
     Logger::instance().debug(QString("Coordinates JSON received: %1")
                             .arg(jsonData.left(100)));
 }
+
+void ROS2Interface::detectionResultsCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    QString jsonData = QString::fromStdString(msg->data);
+    emit detectionResultsReceived(jsonData);
+
+    Logger::instance().debug(QString("Detection results received: %1")
+                            .arg(jsonData.left(200)));
+}
+
 #endif

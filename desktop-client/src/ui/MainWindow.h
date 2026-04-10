@@ -44,6 +44,8 @@ private slots:
     void onAddSidebar();         // unified controls panel
     void onAddSensorData();
     void onAddCoordinates();
+    void onAddCurrentDetection();
+    void onAddDetectionSummary();
     void onAddTwinVisualization();
     void onAddRobotModel();
     void onRemoveWidget();
