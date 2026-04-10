@@ -102,5 +102,19 @@ def generate_launch_description():
             emulate_tty=True,
         ),
 
+        Node(
+            package='mqtt_bridge',
+            executable='mqtt_bridge_node',
+            name='mqtt_bridge_node',
+            output='screen',
+            parameters=[
+                {'mqtt_host': 'sanilinux.mullet-bull.ts.net'},
+                {'mqtt_port': 1883},
+                {'mqtt_keepalive': 60},
+                {'odom_rate_hz': 1.0},
+            ],
+            emulate_tty=True,
+        ),
+
         LogInfo(msg="All nodes started successfully!"),
     ])

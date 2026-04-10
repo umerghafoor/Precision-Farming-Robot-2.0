@@ -148,3 +148,10 @@ topics:
 logging:
   log_level: "INFO"            # Log level: DEBUG, INFO, WARN, ERROR
   # Options: DEBUG (verbose), INFO (normal), WARN (warnings only), ERROR (errors only)
+
+# MQTT Bridge Parameters
+mqtt_bridge:
+  mqtt_host: "sanilinux.mullet-bull.ts.net"  # Tailscale hostname of the machine running Mosquitto
+  mqtt_port: 1883
+  mqtt_keepalive: 60
+  odom_rate_hz: 1.0            # Throttle odom to 1 Hz (20 Hz raw is too fast for MySQL writes)
