@@ -112,6 +112,9 @@ def generate_launch_description():
                 {'mqtt_port': 1883},
                 {'mqtt_keepalive': 60},
                 {'odom_rate_hz': 1.0},
+                {'image_rate_hz': 0.5},   # annotated detection frames → robot/image
+                {'imu_rate_hz': 1.0},     # IMU heading/accel/gyro → robot/imu
+                {'image_quality': 60},    # JPEG quality (1-95); lower = smaller MQTT payload
             ],
             emulate_tty=True,
         ),
