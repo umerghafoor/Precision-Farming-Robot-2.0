@@ -16,6 +16,8 @@
   <exec_depend>camera_sensor</exec_depend>
   <exec_depend>encoder_odometry</exec_depend>
   <exec_depend>robot_controller</exec_depend>
+  <exec_depend>yolo_detection</exec_depend>
+  <exec_depend>mqtt_bridge</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

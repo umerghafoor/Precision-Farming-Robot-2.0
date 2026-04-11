@@ -7,6 +7,10 @@ MODE="${1:-all}"
 VIDEO_DEVICE_ARG="${2:-}"
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-ros2}"
 VIDEO_DEVICE="${VIDEO_DEVICE:-/dev/video8}"
+MQTT_HOST="${MQTT_HOST:-sanilinux.mullet-bull.ts.net}"
+MQTT_PORT="${MQTT_PORT:-1883}"
+MQTT_KEEPALIVE="${MQTT_KEEPALIVE:-60}"
+ODOM_RATE_HZ="${ODOM_RATE_HZ:-1.0}"
 SELECTED_VIDEO_DEVICE=""
 WEBCAM_DEVICE_INDEX="${WEBCAM_DEVICE_INDEX:-}"
 SELECTED_WEBCAM_DEVICE_INDEX=""
@@ -120,6 +124,7 @@ set -u
 echo "Workspace: $SCRIPT_DIR"
 echo "Conda env: $CONDA_ENV_NAME"
 echo "Mode: $MODE"
+echo "MQTT broker: $MQTT_HOST:$MQTT_PORT"
 
 if [[ "$MODE" == "webcam" ]]; then
   if ! resolve_video_device; then
@@ -156,6 +161,11 @@ action_all_nodes() {
   start_node encoder_node ros2 run encoder_odometry encoder_node
   start_node robot_controller ros2 run robot_controller robot_controller
   start_node camera_node ros2 run camera_sensor camera_node
+  start_node mqtt_bridge ros2 run mqtt_bridge mqtt_bridge_node --ros-args \
+    -p mqtt_host:="$MQTT_HOST" \
+    -p mqtt_port:="$MQTT_PORT" \
+    -p mqtt_keepalive:="$MQTT_KEEPALIVE" \
+    -p odom_rate_hz:="$ODOM_RATE_HZ"
 
   echo ""
   echo "All nodes started. Press Ctrl+C to stop all."
@@ -166,6 +176,14 @@ action_all_nodes() {
 
 action_yolo_only() {
   ros2 run yolo_detection yolo_detection_node
+}
+
+action_mqtt_only() {
+  ros2 run mqtt_bridge mqtt_bridge_node --ros-args \
+    -p mqtt_host:="$MQTT_HOST" \
+    -p mqtt_port:="$MQTT_PORT" \
+    -p mqtt_keepalive:="$MQTT_KEEPALIVE" \
+    -p odom_rate_hz:="$ODOM_RATE_HZ"
 }
 
 case "$MODE" in
@@ -181,19 +199,25 @@ case "$MODE" in
     echo "Starting YOLO node only..."
     action_yolo_only
     ;;
+  mqtt)
+    echo "Starting MQTT bridge node only..."
+    action_mqtt_only
+    ;;
   all)
     action_all_nodes
     ;;
   *)
-    echo "Usage: ./start_node.sh [camera|webcam|yolo|all] [video_device]"
+    echo "Usage: ./start_node.sh [camera|webcam|yolo|mqtt|all] [video_device]"
     echo "Examples:"
     echo "  ./start_node.sh camera"
     echo "  ./start_node.sh webcam"
     echo "  ./start_node.sh yolo"
+    echo "  ./start_node.sh mqtt"
     echo "  ./start_node.sh webcam /dev/video1"
     echo "  VIDEO_DEVICE=/dev/video1 ./start_node.sh camera"
     echo "  VIDEO_DEVICE=/dev/video1 ./start_node.sh webcam"
     echo "  WEBCAM_DEVICE_INDEX=1 ./start_node.sh webcam"
+    echo "  MQTT_HOST=192.168.1.10 MQTT_PORT=1883 ./start_node.sh mqtt"
     echo "  ./start_node.sh all"
     exit 1
     ;;
