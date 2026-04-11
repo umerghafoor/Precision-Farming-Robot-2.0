@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "constants.h"
 #include "motor_control.h"
+#include "servo_control.h"
 
 /**
  * Signal Processor Module

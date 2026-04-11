@@ -2,15 +2,13 @@
 """
 6D Signal USB Serial Master Controller with Keyboard Control
 Sends 6-byte signal to Arduino for motor control via USB Serial
-Control using arrow keys: UP, DOWN, LEFT, RIGHT
+Control keys: Arrow keys for drive, Q/A for Servo 1, W/S for Servo 2
 Format: [Dir1, Speed1, Dir2, Speed2, Dir3, Speed3]
 """
 
 import serial
 import time
 import sys
-import threading
-from pynput import keyboard
 import curses
 from time import sleep
 
@@ -87,6 +85,18 @@ class MotorController:
         except Exception as e:
             print(f"ERROR: Failed to send data: {e}")
             return False
+
+    def send_text_command(self, command):
+        """Send newline-delimited text command to Arduino command parser."""
+        try:
+            payload = f"{command.strip()}\n".encode("utf-8")
+            self.serial.write(payload)
+            self.serial.flush()
+            print(f"DEBUG: Text command sent -> {command.strip().upper()}")
+            return True
+        except Exception as e:
+            print(f"ERROR: Failed to send text command '{command}': {e}")
+            return False
     
     def _dir_name(self, direction):
         """Convert direction code to readable name"""
@@ -133,101 +143,72 @@ class MotorController:
 
 
 class KeyboardController:
-    """Keyboard control handler for arrow keys"""
+    """Keyboard control handler for motor + dual-servo keys"""
     
     def __init__(self, motor_controller):
         self.controller = motor_controller
         self.current_speed = 180
-        self.turn_speed = 150
-        self.is_moving = False
-        self.current_direction = None
-        
-    def on_press(self, key):
-        """Handle key press events"""
-        try:
-            if key == keyboard.Key.up:
-                if not self.is_moving or self.current_direction != 'forward':
-                    print("\n[KEYBOARD] UP pressed - Moving FORWARD")
-                    self.controller.move_forward(speed=self.current_speed)
-                    self.is_moving = True
-                    self.current_direction = 'forward'
-                    
-            elif key == keyboard.Key.down:
-                if not self.is_moving or self.current_direction != 'backward':
-                    print("\n[KEYBOARD] DOWN pressed - Moving BACKWARD")
-                    self.controller.move_backward(speed=self.current_speed)
-                    self.is_moving = True
-                    self.current_direction = 'backward'
-                    
-            elif key == keyboard.Key.left:
-                if not self.is_moving or self.current_direction != 'left':
-                    print("\n[KEYBOARD] LEFT pressed - Turning LEFT")
-                    self.controller.turn_left(speed=self.turn_speed)
-                    self.is_moving = True
-                    self.current_direction = 'left'
-                    
-            elif key == keyboard.Key.right:
-                if not self.is_moving or self.current_direction != 'right':
-                    print("\n[KEYBOARD] RIGHT pressed - Turning RIGHT")
-                    self.controller.turn_right(speed=self.turn_speed)
-                    self.is_moving = True
-                    self.current_direction = 'right'
-                    
-            elif key == keyboard.Key.space:
-                print("\n[KEYBOARD] SPACE pressed - STOP")
-                self.controller.stop_all()
-                self.is_moving = False
-                self.current_direction = None
-                
-            elif key == keyboard.Key.esc:
-                print("\n[KEYBOARD] ESC pressed - Exiting...")
-                self.controller.stop_all()
-                return False  # Stop listener
-                
-        except Exception as e:
-            print(f"Error handling key press: {e}")
-    
-    def on_release(self, key):
-        """Handle key release events"""
-        try:
-            if key in [keyboard.Key.up, keyboard.Key.down, 
-                      keyboard.Key.left, keyboard.Key.right]:
-                print(f"\n[KEYBOARD] Key released - STOP")
-                self.controller.stop_all()
-                self.is_moving = False
-                self.current_direction = None
-                
-        except Exception as e:
-            print(f"Error handling key release: {e}")
+
+    def handle_key(self, key):
+        """Handle a curses key code. Returns False when exit is requested."""
+        if key == curses.KEY_UP:
+            print("\n[KEYBOARD] UP -> FORWARD")
+            self.controller.move_forward(speed=self.current_speed)
+        elif key == curses.KEY_DOWN:
+            print("\n[KEYBOARD] DOWN -> BACKWARD")
+            self.controller.move_backward(speed=self.current_speed)
+        elif key == curses.KEY_LEFT:
+            print("\n[KEYBOARD] LEFT -> TURN LEFT")
+            self.controller.turn_left(speed=150)
+        elif key == curses.KEY_RIGHT:
+            print("\n[KEYBOARD] RIGHT -> TURN RIGHT")
+            self.controller.turn_right(speed=150)
+        elif key in (ord('q'), ord('Q')):
+            print("\n[KEYBOARD] Q -> SERVO 1 LEFT")
+            self.controller.send_text_command("Q")
+        elif key in (ord('a'), ord('A')):
+            print("\n[KEYBOARD] A -> SERVO 1 RIGHT")
+            self.controller.send_text_command("A")
+        elif key in (ord('w'), ord('W')):
+            print("\n[KEYBOARD] W -> SERVO 2 LEFT")
+            self.controller.send_text_command("W")
+        elif key in (ord('s'), ord('S')):
+            print("\n[KEYBOARD] S -> SERVO 2 RIGHT")
+            self.controller.send_text_command("S")
+        elif key in (ord(' '), ord('x'), ord('X')):
+            print("\n[KEYBOARD] STOP")
+            self.controller.stop_all()
+        elif key in (ord('e'), ord('E')):
+            print("\n[KEYBOARD] E -> CENTER SERVOS")
+            self.controller.send_text_command("CENTER")
+        elif key == 27:  # ESC
+            print("\n[KEYBOARD] ESC -> EXIT")
+            self.controller.stop_all()
+            return False
+
+        return True
 
 
 def main(stdscr):
     # Clear screen
     stdscr.clear()
     stdscr.nodelay(True)  # Non-blocking input
-    stdscr.keypad(True)   # Enable arrow keys
+    stdscr.keypad(True)
 
-    print("Ready! Use arrow keys to control the robot...")
+    print("Ready! Controls: Arrow keys=drive, Q/A=servo1 left/right, W/S=servo2 left/right, E=center servos, SPACE/X=stop, ESC=exit")
     
     # Initialize your motor controller
     controller = MotorController(port="/dev/ttyUSB0", baudrate=115200)
+    keyboard_controller = KeyboardController(controller)
     
     try:
         while True:
             key = stdscr.getch()
-            
-            if key == curses.KEY_UP:
-                controller.move_forward()
-            elif key == curses.KEY_DOWN:
-                controller.move_backward()
-            elif key == curses.KEY_LEFT:
-                controller.turn_left()
-            elif key == curses.KEY_RIGHT:
-                controller.turn_right()
-            elif key == ord(' '):
-                controller.stop_all()
-            elif key == 27:  # ESC
-                break
+
+            if key != -1:
+                should_continue = keyboard_controller.handle_key(key)
+                if not should_continue:
+                    break
 
             sleep(0.05)  # small delay to reduce CPU usage
     finally:

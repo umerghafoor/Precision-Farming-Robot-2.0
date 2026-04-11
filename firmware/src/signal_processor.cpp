@@ -43,7 +43,20 @@ void process6DSignal() {
 }
 
 void checkSerialData() {
-  // Check if we have data available on Serial
+  if (Serial.available() <= 0) {
+    return;
+  }
+
+  // Prioritize text commands first so they are not consumed as binary payload.
+  char first = Serial.peek();
+  if ((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z')) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    handleTextCommand(cmd);
+    return;
+  }
+
+  // Otherwise process binary 6D control packet when enough bytes are present.
   if (Serial.available() >= SIGNAL_SIZE) {
     digitalWrite(LED_PIN, HIGH);
     
@@ -60,30 +73,44 @@ void checkSerialData() {
     process6DSignal();
     
     digitalWrite(LED_PIN, LOW);
-  }
-  // Check for text commands
-  else if (Serial.available() > 0) {
-    // Check if it's a text command (starts with a letter)
-    char first = Serial.peek();
-    
-    if (first >= 'A' && first <= 'Z') {
-      String cmd = Serial.readStringUntil('\n');
-      cmd.trim();
-      handleTextCommand(cmd);
-    } else {
-      // Not enough bytes yet, wait
-      delay(10);
-    }
+  } else {
+    // Not enough bytes for a binary packet yet.
+    delay(10);
   }
 }
 
 void handleTextCommand(String cmd) {
+  cmd.trim();
+  cmd.toUpperCase();
+
   Serial.print("DEBUG: Serial command received: ");
   Serial.println(cmd);
   
-  if (cmd == "STOP") {
+  if (cmd == "STOP" || cmd == "X") {
     Serial.println("DEBUG: Emergency stop commanded!");
     stopAllMotors();
+  } else if (cmd == "Q") {
+    Serial.println("DEBUG: Servo 1 step left");
+    adjustServo1(-SERVO_STEP_ANGLE);
+  } else if (cmd == "A") {
+    Serial.println("DEBUG: Servo 1 step right");
+    adjustServo1(SERVO_STEP_ANGLE);
+  } else if (cmd == "W") {
+    Serial.println("DEBUG: Servo 2 step left");
+    adjustServo2(-SERVO_STEP_ANGLE);
+  } else if (cmd == "S") {
+    Serial.println("DEBUG: Servo 2 step right");
+    adjustServo2(SERVO_STEP_ANGLE);
+  } else if (cmd == "Z") {
+    Serial.println("DEBUG: Servo 2 step left");
+    adjustServo2(-SERVO_STEP_ANGLE);
+  } else if (cmd == "C") {
+    Serial.println("DEBUG: Servo 2 step right");
+    adjustServo2(SERVO_STEP_ANGLE);
+  } else if (cmd == "CENTER") {
+    Serial.println("DEBUG: Centering both servos");
+    setServo1Angle(SERVO_DEFAULT_ANGLE);
+    setServo2Angle(SERVO_DEFAULT_ANGLE);
   } else if (cmd == "TEST") {
     Serial.println("DEBUG: Running test sequence...");
     // Test sequence
@@ -107,19 +134,19 @@ void handleTextCommand(String cmd) {
       Serial.println(signalBuffer[i], HEX);
     }
     Serial.println("=====================\n");
-  } else if (cmd == "FORWARD") {
-    Serial.println("DEBUG: Moving forward");
-    moveForward(180);
-  } else if (cmd == "BACKWARD") {
-    Serial.println("DEBUG: Moving backward");
-    moveBackward(180);
   } else if (cmd == "LEFT") {
     Serial.println("DEBUG: Turning left");
     turnLeft(150);
   } else if (cmd == "RIGHT") {
     Serial.println("DEBUG: Turning right");
     turnRight(150);
+  } else if (cmd == "FORWARD") {
+    Serial.println("DEBUG: Moving forward");
+    moveForward(180);
+  } else if (cmd == "BACKWARD") {
+    Serial.println("DEBUG: Moving backward");
+    moveBackward(180);
   } else {
-    Serial.println("DEBUG: Unknown command. Available: STOP, TEST, STATUS, FORWARD, BACKWARD, LEFT, RIGHT");
+    Serial.println("DEBUG: Unknown command. Available: Q, A, W, S, X/STOP, CENTER, Z, C, TEST, STATUS, FORWARD, BACKWARD, LEFT, RIGHT");
   }
 }

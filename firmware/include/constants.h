@@ -7,6 +7,16 @@
 #define MOTOR3_INDEX 3
 #define MOTOR4_INDEX 4
 
+// Adafruit Motor Shield v1 servo headers
+// Servo 1 -> D10, Servo 2 -> D9
+#define SERVO1_PIN 10
+#define SERVO2_PIN 9
+
+#define SERVO_MIN_ANGLE 0
+#define SERVO_MAX_ANGLE 180
+#define SERVO_DEFAULT_ANGLE 90
+#define SERVO_STEP_ANGLE 5
+
 #define LED_PIN 13     // Onboard LED
 
 // 6D Signal Structure:
