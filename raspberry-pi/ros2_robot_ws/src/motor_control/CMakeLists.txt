@@ -19,7 +19,14 @@ target_include_directories(motor_driver PUBLIC
 )
 ament_target_dependencies(motor_driver rclcpp geometry_msgs)
 
-install(TARGETS motor_driver DESTINATION lib/${PROJECT_NAME})
+add_executable(spi_controller_bridge src/spi_controller_bridge.cpp)
+target_include_directories(spi_controller_bridge PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(spi_controller_bridge rclcpp geometry_msgs std_msgs)
+
+install(TARGETS motor_driver spi_controller_bridge DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

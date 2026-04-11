@@ -12,16 +12,25 @@ def generate_launch_description():
     return LaunchDescription([
         LogInfo(msg="Starting 4-Wheel Differential Robot..."),
         
-        # Motor Driver Node
+        # SPI Controller Bridge Node
         Node(
             package='motor_control',
-            executable='motor_driver',
-            name='motor_driver',
+            executable='spi_controller_bridge',
+            name='spi_controller_bridge',
             output='screen',
             parameters=[
+                {'cmd_vel_topic': '/cmd_vel'},
+                {'servo1_topic': '/servo1/angle'},
+                {'servo2_topic': '/servo2/angle'},
+                {'spi_device': '/dev/spidev0.0'},
+                {'spi_mode': 0},
+                {'spi_bits_per_word': 8},
+                {'spi_speed_hz': 500000},
                 {'wheel_base': 0.2},
-                {'wheel_radius': 0.05},
-                {'max_speed': 1.0},
+                {'max_linear_velocity': 1.0},
+                {'cmd_timeout_sec': 0.5},
+                {'tx_rate_hz': 20.0},
+                {'default_servo_angle': 90},
             ],
             emulate_tty=True,
         ),

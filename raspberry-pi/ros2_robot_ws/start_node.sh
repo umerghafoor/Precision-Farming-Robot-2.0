@@ -151,7 +151,7 @@ action_webcam_only() {
 }
 
 action_all_nodes() {
-  start_node motor_driver ros2 run motor_control motor_driver
+  start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge
   start_node imu_node ros2 run imu_sensor imu_node
   start_node encoder_node ros2 run encoder_odometry encoder_node
   start_node robot_controller ros2 run robot_controller robot_controller
@@ -168,6 +168,10 @@ action_yolo_only() {
   ros2 run yolo_detection yolo_detection_node
 }
 
+action_spi_only() {
+  ros2 run motor_control spi_controller_bridge
+}
+
 case "$MODE" in
   camera)
     echo "Starting camera node only..."
@@ -181,15 +185,20 @@ case "$MODE" in
     echo "Starting YOLO node only..."
     action_yolo_only
     ;;
+  spi)
+    echo "Starting SPI controller bridge only..."
+    action_spi_only
+    ;;
   all)
     action_all_nodes
     ;;
   *)
-    echo "Usage: ./start_node.sh [camera|webcam|yolo|all] [video_device]"
+    echo "Usage: ./start_node.sh [camera|webcam|yolo|spi|all] [video_device]"
     echo "Examples:"
     echo "  ./start_node.sh camera"
     echo "  ./start_node.sh webcam"
     echo "  ./start_node.sh yolo"
+    echo "  ./start_node.sh spi"
     echo "  ./start_node.sh webcam /dev/video1"
     echo "  VIDEO_DEVICE=/dev/video1 ./start_node.sh camera"
     echo "  VIDEO_DEVICE=/dev/video1 ./start_node.sh webcam"
