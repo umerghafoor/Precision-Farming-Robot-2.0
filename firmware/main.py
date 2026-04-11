@@ -148,6 +148,13 @@ class KeyboardController:
     def __init__(self, motor_controller):
         self.controller = motor_controller
         self.current_speed = 180
+        self.min_speed = 0
+        self.max_speed = 255
+        self.speed_step = 10
+
+    def _adjust_speed(self, delta):
+        self.current_speed = max(self.min_speed, min(self.max_speed, self.current_speed + delta))
+        print(f"\n[KEYBOARD] SPEED -> {self.current_speed}")
 
     def handle_key(self, key):
         """Handle a curses key code. Returns False when exit is requested."""
@@ -175,11 +182,15 @@ class KeyboardController:
         elif key in (ord('s'), ord('S')):
             print("\n[KEYBOARD] S -> SERVO 2 RIGHT")
             self.controller.send_text_command("S")
+        elif key in (ord('e'), ord('E')):
+            self._adjust_speed(self.speed_step)
+        elif key in (ord('d'), ord('D')):
+            self._adjust_speed(-self.speed_step)
         elif key in (ord(' '), ord('x'), ord('X')):
             print("\n[KEYBOARD] STOP")
             self.controller.stop_all()
-        elif key in (ord('e'), ord('E')):
-            print("\n[KEYBOARD] E -> CENTER SERVOS")
+        elif key in (ord('r'), ord('R')):
+            print("\n[KEYBOARD] R -> CENTER SERVOS")
             self.controller.send_text_command("CENTER")
         elif key == 27:  # ESC
             print("\n[KEYBOARD] ESC -> EXIT")
@@ -195,7 +206,7 @@ def main(stdscr):
     stdscr.nodelay(True)  # Non-blocking input
     stdscr.keypad(True)
 
-    print("Ready! Controls: Arrow keys=drive, Q/A=servo1 left/right, W/S=servo2 left/right, E=center servos, SPACE/X=stop, ESC=exit")
+    print("Ready! Controls: Arrow keys=drive, E/D=speed +/- , Q/A=servo1 left/right, W/S=servo2 left/right, R=center servos, SPACE/X=stop, ESC=exit")
     
     # Initialize your motor controller
     controller = MotorController(port="/dev/ttyUSB0", baudrate=115200)
