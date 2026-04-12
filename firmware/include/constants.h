@@ -3,8 +3,8 @@
 
 // AFMotor channel mapping (Adafruit Motor Shield v1)
 #define MOTOR1_INDEX 1
-#define MOTOR2_INDEX 2
-#define MOTOR3_INDEX 3
+#define MOTOR2_INDEX 3
+#define MOTOR3_INDEX 2
 #define MOTOR4_INDEX 4
 
 // Adafruit Motor Shield v1 servo headers
