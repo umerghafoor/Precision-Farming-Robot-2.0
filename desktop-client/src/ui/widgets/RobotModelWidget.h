@@ -44,6 +44,8 @@ private slots:
     void onLoadFailed(const QString &reason);
     void onTwinStateChanged();
     void onResetCamera();
+    void onCameraMode(int mode);   // 0=Orbit 1=TopView 2=BackView
+    void onClearTrail();
 
 private:
     void setupUI();
@@ -64,6 +66,9 @@ private:
     ModelGLView   *m_glView        = nullptr;
 #endif
     QPushButton   *m_resetBtn      = nullptr;
+    QPushButton   *m_camFreeBtn   = nullptr;
+    QPushButton   *m_camTopBtn    = nullptr;
+    QPushButton   *m_camBackBtn   = nullptr;
 
     // Page 2 – not supported
     QLabel        *m_unsupported   = nullptr;

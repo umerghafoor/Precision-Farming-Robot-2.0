@@ -28,11 +28,18 @@ struct GLMesh {
  * Performance model: update() is only called when state actually changes
  * (new mesh data, status color, wheel angle, or camera interaction).
  * No continuous render loop.
+ *
+ * Camera modes:
+ *   Orbit    — free orbit camera (mouse drag / wheel zoom)
+ *   TopView  — overhead, robot-following, wheel-zoom adjusts height
+ *   BackView — fixed behind robot, follows position and heading
  */
 class ModelGLView : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core
 {
     Q_OBJECT
 public:
+    enum class CameraMode { Orbit, TopView, BackView };
+
     explicit ModelGLView(QWidget *parent = nullptr);
     ~ModelGLView() override;
 
@@ -50,6 +57,11 @@ public:
     void setRobotPose(const QVector3D &pos, const QQuaternion &ori);
 
     void resetCamera();
+    void setCameraMode(CameraMode mode);
+    CameraMode cameraMode() const { return m_cameraMode; }
+    void zoomIn();
+    void zoomOut();
+    void clearTrail();
 
 signals:
     void glInitialized();
@@ -67,7 +79,8 @@ private:
     void uploadPendingMeshes();
     void drawMesh(const GLMesh &mesh);
     QMatrix4x4 wheelModelMatrix(const GLMesh &mesh) const;
-    void setupGrid(float sceneSize, float groundY);
+    void setupGrid(float groundY);
+    void uploadTrail();   // (re)uploads trail VBO to GPU
 
     QOpenGLShaderProgram  *m_program      = nullptr;
     bool                   m_glReady      = false;
@@ -81,16 +94,28 @@ private:
     QMap<QString, QVector3D> m_colorOverrides;
     QMap<QString, float>     m_wheelAngles;
 
-    // Ground-plane grid
+    // Ground-plane grid (infinite: rendered with snapped XZ offset each frame)
     GLuint  m_gridVao       = 0;
     GLuint  m_gridVbo       = 0;
     int     m_gridLineVerts = 0;
     bool    m_gridReady     = false;
+    float   m_gridGroundY   = 0.0f;   // world Y of the ground plane
+
+    // Path trail
+    QVector<QVector3D> m_trailPts;     // XZ trail in GL world coords (Y stored as 0)
+    GLuint             m_trailVao  = 0;
+    GLuint             m_trailVbo  = 0;
+    bool               m_trailDirty = false;
+    static constexpr int   MAX_TRAIL_PTS  = 8000;
+    static constexpr float TRAIL_MIN_DIST = 0.05f;  // metres
 
     // Robot world pose (updated via setRobotPose)
     QMatrix4x4  m_robotMatrix;      // cached transform applied to all robot meshes
     QVector3D   m_robotPos;
     QQuaternion m_robotOri;
+
+    // Camera
+    CameraMode m_cameraMode     = CameraMode::Orbit;
 
     // Orbit camera state
     float     m_azimuth         =  30.0f;

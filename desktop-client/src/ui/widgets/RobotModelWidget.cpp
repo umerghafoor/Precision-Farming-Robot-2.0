@@ -141,15 +141,68 @@ void RobotModelWidget::setupUI()
         QHBoxLayout *toolbar = new QHBoxLayout;
         QLabel *title = new QLabel("3D Model View");
         title->setStyleSheet("QLabel { font-weight: bold; font-size: 11px; color: #ccc; }");
-        m_resetBtn = new QPushButton("Reset Camera");
-        m_resetBtn->setFixedHeight(22);
-        m_resetBtn->setStyleSheet(
-            "QPushButton { background:#2a2a2a; color:#bbb; border:1px solid #444;"
-            " border-radius:3px; padding:0 8px; font-size:11px; }"
-            "QPushButton:hover { background:#3a3a3a; }");
+
+        auto makeBtn = [](const QString &text) {
+            auto *b = new QPushButton(text);
+            b->setFixedHeight(22);
+            b->setCheckable(true);
+            b->setStyleSheet(
+                "QPushButton { background:#2a2a2a; color:#bbb; border:1px solid #444;"
+                " border-radius:3px; padding:0 8px; font-size:11px; }"
+                "QPushButton:hover { background:#3a3a3a; }"
+                "QPushButton:checked { background:#1e4d1e; color:#7dff7d; border-color:#4CAF50; }");
+            return b;
+        };
+
+        m_camFreeBtn = makeBtn("Free");
+        m_camTopBtn  = makeBtn("Top");
+        m_camBackBtn = makeBtn("Back");
+        m_camFreeBtn->setChecked(true);   // default mode
+
+        connect(m_camFreeBtn, &QPushButton::clicked, this, [this]{ onCameraMode(0); });
+        connect(m_camTopBtn,  &QPushButton::clicked, this, [this]{ onCameraMode(1); });
+        connect(m_camBackBtn, &QPushButton::clicked, this, [this]{ onCameraMode(2); });
+
+        auto makeTextBtn = [](const QString &text) {
+            auto *b = new QPushButton(text);
+            b->setFixedHeight(22);
+            b->setStyleSheet(
+                "QPushButton { background:#2a2a2a; color:#bbb; border:1px solid #444;"
+                " border-radius:3px; padding:0 8px; font-size:11px; }"
+                "QPushButton:hover { background:#3a3a3a; }");
+            return b;
+        };
+
+        m_resetBtn = makeTextBtn("Reset");
         connect(m_resetBtn, &QPushButton::clicked, this, &RobotModelWidget::onResetCamera);
+
+        auto *clearTrailBtn = makeTextBtn("Clear Trail");
+        connect(clearTrailBtn, &QPushButton::clicked, this, &RobotModelWidget::onClearTrail);
+
+        auto *zoomInBtn  = new QPushButton("+");
+        auto *zoomOutBtn = new QPushButton("−");
+        for (auto *b : {zoomInBtn, zoomOutBtn}) {
+            b->setFixedSize(22, 22);
+            b->setStyleSheet(
+                "QPushButton { background:#2a2a2a; color:#bbb; border:1px solid #444;"
+                " border-radius:3px; font-size:14px; font-weight:bold; }"
+                "QPushButton:hover { background:#3a3a3a; }");
+        }
+#ifdef HAVE_QT_OPENGL
+        connect(zoomInBtn,  &QPushButton::clicked, this, [this]{ if (m_glView) m_glView->zoomIn();  });
+        connect(zoomOutBtn, &QPushButton::clicked, this, [this]{ if (m_glView) m_glView->zoomOut(); });
+#endif
+
         toolbar->addWidget(title);
         toolbar->addStretch();
+        toolbar->addWidget(m_camFreeBtn);
+        toolbar->addWidget(m_camTopBtn);
+        toolbar->addWidget(m_camBackBtn);
+        toolbar->addSpacing(6);
+        toolbar->addWidget(zoomOutBtn);
+        toolbar->addWidget(zoomInBtn);
+        toolbar->addSpacing(6);
+        toolbar->addWidget(clearTrailBtn);
         toolbar->addWidget(m_resetBtn);
         l->addLayout(toolbar);
 
@@ -353,6 +406,31 @@ void RobotModelWidget::updateWheelStatus(const QString &robotStatus)
 void RobotModelWidget::onResetCamera()
 {
 #ifdef HAVE_QT_OPENGL
-    if (m_glView) m_glView->resetCamera();
+    if (m_glView) {
+        m_glView->resetCamera();   // switches back to Orbit
+        m_camFreeBtn->setChecked(true);
+        m_camTopBtn->setChecked(false);
+        m_camBackBtn->setChecked(false);
+    }
+#endif
+}
+
+void RobotModelWidget::onClearTrail()
+{
+#ifdef HAVE_QT_OPENGL
+    if (m_glView) m_glView->clearTrail();
+#endif
+}
+
+void RobotModelWidget::onCameraMode(int mode)
+{
+#ifdef HAVE_QT_OPENGL
+    if (!m_glView) return;
+    m_camFreeBtn->setChecked(mode == 0);
+    m_camTopBtn->setChecked(mode == 1);
+    m_camBackBtn->setChecked(mode == 2);
+    m_glView->setCameraMode(static_cast<ModelGLView::CameraMode>(mode));
+#else
+    Q_UNUSED(mode)
 #endif
 }

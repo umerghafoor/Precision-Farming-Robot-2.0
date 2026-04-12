@@ -81,8 +81,10 @@ ModelGLView::~ModelGLView()
         if (mesh.vbo)   glDeleteBuffers(1, &mesh.vbo);
         if (mesh.texId) glDeleteTextures(1, &mesh.texId);
     }
-    if (m_gridVao) glDeleteVertexArrays(1, &m_gridVao);
-    if (m_gridVbo) glDeleteBuffers(1, &m_gridVbo);
+    if (m_gridVao)  glDeleteVertexArrays(1, &m_gridVao);
+    if (m_gridVbo)  glDeleteBuffers(1, &m_gridVbo);
+    if (m_trailVao) glDeleteVertexArrays(1, &m_trailVao);
+    if (m_trailVbo) glDeleteBuffers(1, &m_trailVbo);
     delete m_program;
     doneCurrent();
 }
@@ -162,6 +164,23 @@ void ModelGLView::setRobotPose(const QVector3D &pos, const QQuaternion &ori)
     // Extract yaw (rotation around ROS Z = GL Y)
     float yawRad = 2.0f * std::atan2(ori.z(), ori.scalar());
     m_robotMatrix.rotate(qRadiansToDegrees(yawRad), 0.0f, 1.0f, 0.0f);
+    // The robot OBJ model's native forward is GL +Z; rotate -90° around Y
+    // so the model visually faces GL +X (= ROS forward direction).
+    m_robotMatrix.rotate(-90.0f, 0.0f, 1.0f, 0.0f);
+
+    // Append to path trail (XZ only; Y applied at render time)
+    QVector3D glPt(pos.x(), 0.0f, -pos.y());
+    if (m_trailPts.isEmpty() ||
+        (glPt - m_trailPts.last()).length() >= TRAIL_MIN_DIST)
+    {
+        if (m_trailPts.size() >= MAX_TRAIL_PTS)
+            m_trailPts.removeFirst();   // oldest point out
+        m_trailPts.append(glPt);
+        m_trailDirty = true;
+    }
+
+    if (m_glReady && m_trailDirty)
+        uploadTrail();
 
     update();
 }
@@ -172,6 +191,38 @@ void ModelGLView::resetCamera()
     m_elevation =  18.0f;
     m_distance  =  m_initialDistance;
     m_target    =  m_initialTarget;
+    m_cameraMode = CameraMode::Orbit;
+    update();
+}
+
+void ModelGLView::setCameraMode(CameraMode mode)
+{
+    m_cameraMode = mode;
+    // Give TopView a sensible starting height
+    if (mode == CameraMode::TopView && m_distance < 2.0f)
+        m_distance = 10.0f;
+    update();
+}
+
+void ModelGLView::zoomIn()
+{
+    if (m_cameraMode == CameraMode::BackView) return;
+    m_distance = qBound(0.5f, m_distance * 0.80f, 10000.0f);
+    update();
+}
+
+void ModelGLView::zoomOut()
+{
+    if (m_cameraMode == CameraMode::BackView) return;
+    m_distance = qBound(0.5f, m_distance * 1.25f, 10000.0f);
+    update();
+}
+
+void ModelGLView::clearTrail()
+{
+    m_trailPts.clear();
+    m_trailDirty = true;
+    if (m_glReady) uploadTrail();
     update();
 }
 
@@ -199,6 +250,15 @@ void ModelGLView::initializeGL()
 
     m_glReady = true;
 
+    // Allocate trail VAO/VBO (empty; filled dynamically as robot moves)
+    glGenVertexArrays(1, &m_trailVao);
+    glGenBuffers(1, &m_trailVbo);
+    glBindVertexArray(m_trailVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_trailVbo);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(QVector3D), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+
     if (m_hasPending)
         uploadPendingMeshes();
 
@@ -222,33 +282,86 @@ void ModelGLView::paintGL()
     if (!m_glReady || m_meshes.isEmpty())
         return;
 
-    // Build view from orbit parameters
-    float az = qDegreesToRadians(m_azimuth);
-    float el = qDegreesToRadians(m_elevation);
-    QVector3D eye = m_target + QVector3D(
-        m_distance * std::cos(el) * std::sin(az),
-        m_distance * std::sin(el),
-        m_distance * std::cos(el) * std::cos(az)
-    );
-
+    // ── Build view matrix based on camera mode ────────────────────────────────
     QMatrix4x4 view;
-    view.lookAt(eye, m_target, {0.0f, 1.0f, 0.0f});
+    // Robot position in GL space (ROS x→GL x, ROS y→GL -z)
+    QVector3D robotGL(m_robotPos.x(), 0.0f, -m_robotPos.y());
+    // Robot yaw in GL space
+    float yawRad = 2.0f * std::atan2(m_robotOri.z(), m_robotOri.scalar());
+    // GL forward vector for the robot: rotate(+X, yawRad, Y) = (cos(yaw), 0, -sin(yaw))
+    QVector3D glForward(std::cos(yawRad), 0.0f, -std::sin(yawRad));
+
+    // Reference point for snapping the infinite grid
+    QVector3D gridSnapRef;
+
+    if (m_cameraMode == CameraMode::Orbit) {
+        float az = qDegreesToRadians(m_azimuth);
+        float el = qDegreesToRadians(m_elevation);
+        QVector3D eye = m_target + QVector3D(
+            m_distance * std::cos(el) * std::sin(az),
+            m_distance * std::sin(el),
+            m_distance * std::cos(el) * std::cos(az)
+        );
+        view.lookAt(eye, m_target, {0.0f, 1.0f, 0.0f});
+        gridSnapRef = m_target;
+
+    } else if (m_cameraMode == CameraMode::TopView) {
+        // Overhead bird's-eye, robot-following; +X (ROS forward) appears upward
+        QVector3D eye = robotGL + QVector3D(0.0f, m_distance, 0.0f);
+        view.lookAt(eye, robotGL, {1.0f, 0.0f, 0.0f});
+        gridSnapRef = robotGL;
+
+    } else { // BackView
+        // Fixed behind and above the robot, looking toward robot + slightly ahead
+        constexpr float BACK_DIST   = 3.0f;   // metres behind robot
+        constexpr float BACK_HEIGHT = 1.5f;   // metres above ground
+        QVector3D glBack = -glForward;
+        QVector3D eye    = robotGL + glBack * BACK_DIST
+                                   + QVector3D(0.0f, BACK_HEIGHT, 0.0f);
+        // Look toward a point slightly ahead of the robot (not just its base)
+        QVector3D lookAt = robotGL + glForward * 2.0f + QVector3D(0.0f, 0.4f, 0.0f);
+        view.lookAt(eye, lookAt, {0.0f, 1.0f, 0.0f});
+        gridSnapRef = robotGL;
+    }
 
     QMatrix4x4 pv = m_proj * view;
 
     m_program->bind();
     m_program->setUniformValue("uPV", pv);
 
-    // ── Ground plane grid ────────────────────────────────────────────────────
+    // ── Ground plane grid (infinite: snap grid origin to nearest cell) ────────
     if (m_gridReady) {
-        QMatrix4x4 identity;
-        m_program->setUniformValue("uModel",  identity);
+        constexpr float CELL = 1.0f;   // must match setupGrid cell size
+        float snapX = std::floor(gridSnapRef.x() / CELL) * CELL;
+        float snapZ = std::floor(gridSnapRef.z() / CELL) * CELL;
+        QMatrix4x4 gridModel;
+        gridModel.translate(snapX, 0.0f, snapZ);   // Y is baked into vertices
+
+        m_program->setUniformValue("uModel",  gridModel);
         m_program->setUniformValue("uColor",  QVector3D(0.20f, 0.32f, 0.20f));
         m_program->setUniformValue("uUnlit",  true);
         glBindVertexArray(m_gridVao);
         glDrawArrays(GL_LINES, 0, m_gridLineVerts);
         glBindVertexArray(0);
         m_program->setUniformValue("uUnlit",  false);
+    }
+
+    // ── Path trail ────────────────────────────────────────────────────────────
+    if (m_trailVao && m_trailPts.size() >= 2) {
+        // Lift the trail slightly above the grid plane
+        QMatrix4x4 trailModel;
+        trailModel.translate(0.0f, m_gridGroundY + 0.01f, 0.0f);
+
+        m_program->setUniformValue("uModel",  trailModel);
+        m_program->setUniformValue("uColor",  QVector3D(1.0f, 0.55f, 0.0f));  // orange
+        m_program->setUniformValue("uUnlit",  true);
+        m_program->setUniformValue("uHasTex", false);
+        glLineWidth(2.0f);
+        glBindVertexArray(m_trailVao);
+        glDrawArrays(GL_LINE_STRIP, 0, m_trailPts.size());
+        glBindVertexArray(0);
+        glLineWidth(1.0f);
+        m_program->setUniformValue("uUnlit", false);
     }
 
     // ── Robot meshes (with world pose applied) ───────────────────────────────
@@ -262,6 +375,7 @@ void ModelGLView::paintGL()
 
 void ModelGLView::mousePressEvent(QMouseEvent *e)
 {
+    if (m_cameraMode != CameraMode::Orbit) return;
     if (e->button() == Qt::LeftButton || e->button() == Qt::RightButton) {
         m_lastMouse = e->pos();
         m_dragging  = true;
@@ -270,7 +384,7 @@ void ModelGLView::mousePressEvent(QMouseEvent *e)
 
 void ModelGLView::mouseMoveEvent(QMouseEvent *e)
 {
-    if (!m_dragging) return;
+    if (!m_dragging || m_cameraMode != CameraMode::Orbit) return;
     QPoint delta = e->pos() - m_lastMouse;
     m_lastMouse  = e->pos();
 
@@ -298,12 +412,15 @@ void ModelGLView::mouseReleaseEvent(QMouseEvent *)
 
 void ModelGLView::wheelEvent(QWheelEvent *e)
 {
+    // BackView has a fixed camera position — zoom has no meaning there
+    if (m_cameraMode == CameraMode::BackView) { e->ignore(); return; }
+
     int delta = e->angleDelta().y();
     if (delta == 0) delta = e->pixelDelta().y();   // trackpad fallback
     if (delta == 0) { e->ignore(); return; }
 
     float factor = delta > 0 ? 0.88f : 1.14f;
-    m_distance   = qBound(0.01f, m_distance * factor, 10000.0f);
+    m_distance   = qBound(0.5f, m_distance * factor, 10000.0f);
     e->accept();
     update();
 }
@@ -388,11 +505,8 @@ void ModelGLView::uploadPendingMeshes()
         m_meshes.append(mesh);
     }
 
-    // Build ground grid now that we know the scene dimensions
-    float sceneSize = qMax(sMax.x() - sMin.x(),
-                      qMax(sMax.y() - sMin.y(),
-                           sMax.z() - sMin.z()));
-    setupGrid(sceneSize, sMin.y());
+    // Build ground grid at the model's floor level
+    setupGrid(sMin.y());
 
     m_pendingMeshes.clear();
     m_hasPending = false;
@@ -442,17 +556,35 @@ QMatrix4x4 ModelGLView::wheelModelMatrix(const GLMesh &mesh) const
     return m;
 }
 
-void ModelGLView::setupGrid(float sceneSize, float groundY)
+void ModelGLView::uploadTrail()
+{
+    if (!m_trailVao) return;   // GL not ready yet
+    makeCurrent();
+    glBindBuffer(GL_ARRAY_BUFFER, m_trailVbo);
+    glBufferData(GL_ARRAY_BUFFER,
+                 (GLsizeiptr)(m_trailPts.size() * sizeof(QVector3D)),
+                 m_trailPts.isEmpty() ? nullptr : m_trailPts.constData(),
+                 GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    doneCurrent();
+    m_trailDirty = false;
+}
+
+void ModelGLView::setupGrid(float groundY)
 {
     // Delete any previous grid buffers
     if (m_gridVao) { glDeleteVertexArrays(1, &m_gridVao); m_gridVao = 0; }
     if (m_gridVbo) { glDeleteBuffers(1, &m_gridVbo); m_gridVbo = 0; }
 
-    // Cell size = ~25% of model extent; grid covers ±20 cells each way
-    float cell    = qMax(sceneSize * 0.25f, 0.01f);
-    int   half    = 20;
-    float ext     = half * cell;
-    float Y       = groundY - 0.001f;   // just below the model's feet
+    // Fixed 1 m cells, ±60 m coverage.  The grid is rendered with an XZ
+    // translation snapped to the nearest cell in paintGL() so it appears
+    // to extend infinitely as the robot/camera moves.
+    constexpr float cell = 1.0f;
+    constexpr int   half = 60;
+    constexpr float ext  = half * cell;
+
+    m_gridGroundY = groundY - 0.001f;   // just below the model's feet
+    const float Y = m_gridGroundY;
 
     QVector<OBJVertex> verts;
     verts.reserve((half * 2 + 1) * 4);
