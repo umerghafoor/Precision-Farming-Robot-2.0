@@ -4,6 +4,7 @@
 #include "Logger.h"
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <QImage>
 #include <QtMath>
 #include <cmath>
 #include <cstddef>   // offsetof
@@ -15,25 +16,30 @@ static const char *VERT_SRC = R"(
 #version 330 core
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNorm;
+layout(location = 2) in vec2 aUV;
 
 uniform mat4 uPV;
 uniform mat4 uModel;
 
 out vec3 vNorm;
+out vec2 vUV;
 
 void main() {
     gl_Position = uPV * uModel * vec4(aPos, 1.0);
-    // uModel is always rotation-only, so mat3(uModel) is the correct normal matrix
     vNorm = mat3(uModel) * aNorm;
+    vUV   = aUV;
 }
 )";
 
 static const char *FRAG_SRC = R"(
 #version 330 core
 in vec3 vNorm;
+in vec2 vUV;
 
-uniform vec3 uColor;
-uniform bool uUnlit;   // true → flat color (used for grid lines)
+uniform vec3      uColor;
+uniform bool      uUnlit;    // true → flat color (grid lines)
+uniform sampler2D uTex;
+uniform bool      uHasTex;   // true → sample uTex; false → use uColor
 
 out vec4 FragColor;
 
@@ -43,13 +49,13 @@ void main() {
         return;
     }
     vec3 n    = normalize(vNorm);
-    // Two-light Phong: warm key from top-right, cool fill from left
     vec3 key  = normalize(vec3( 1.0, 1.8, 1.2));
     vec3 fill = normalize(vec3(-1.0, 0.4,-0.5));
     float kd  = max(dot(n, key),  0.0) * 0.62;
     float fd  = max(dot(n, fill), 0.0) * 0.18;
     float amb = 0.22;
-    FragColor = vec4(uColor * (amb + kd + fd), 1.0);
+    vec3 base = uHasTex ? texture(uTex, vUV).rgb : uColor;
+    FragColor = vec4(base * (amb + kd + fd), 1.0);
 }
 )";
 
@@ -71,8 +77,9 @@ ModelGLView::~ModelGLView()
 {
     makeCurrent();
     for (auto &mesh : m_meshes) {
-        if (mesh.vao) glDeleteVertexArrays(1, &mesh.vao);
-        if (mesh.vbo) glDeleteBuffers(1, &mesh.vbo);
+        if (mesh.vao)   glDeleteVertexArrays(1, &mesh.vao);
+        if (mesh.vbo)   glDeleteBuffers(1, &mesh.vbo);
+        if (mesh.texId) glDeleteTextures(1, &mesh.texId);
     }
     if (m_gridVao) glDeleteVertexArrays(1, &m_gridVao);
     if (m_gridVbo) glDeleteBuffers(1, &m_gridVbo);
@@ -90,6 +97,7 @@ void ModelGLView::loadMeshes(const QVector<OBJMeshData> &meshes)
         for (auto &mesh : m_meshes) {
             glDeleteVertexArrays(1, &mesh.vao);
             glDeleteBuffers(1, &mesh.vbo);
+            if (mesh.texId) glDeleteTextures(1, &mesh.texId);
         }
         doneCurrent();
     }
@@ -347,7 +355,36 @@ void ModelGLView::uploadPendingMeshes()
                               (void*)offsetof(OBJVertex, nx));
         glEnableVertexAttribArray(1);
 
+        // attrib 2: UV (tu,tv)
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
+                              sizeof(OBJVertex),
+                              (void*)offsetof(OBJVertex, tu));
+        glEnableVertexAttribArray(2);
+
         glBindVertexArray(0);
+
+        // Upload diffuse texture if available
+        if (!data.texturePath.isEmpty()) {
+            QImage img(data.texturePath);
+            if (!img.isNull()) {
+                img = img.convertToFormat(QImage::Format_RGBA8888).mirrored();
+                glGenTextures(1, &mesh.texId);
+                glBindTexture(GL_TEXTURE_2D, mesh.texId);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                             img.width(), img.height(), 0,
+                             GL_RGBA, GL_UNSIGNED_BYTE, img.constBits());
+                glGenerateMipmap(GL_TEXTURE_2D);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glBindTexture(GL_TEXTURE_2D, 0);
+                Logger::instance().info(
+                    QString("ModelGLView: loaded texture for '%1'").arg(data.name));
+            } else {
+                Logger::instance().warning(
+                    QString("ModelGLView: failed to load texture '%1'").arg(data.texturePath));
+            }
+        }
+
         m_meshes.append(mesh);
     }
 
@@ -379,9 +416,20 @@ void ModelGLView::drawMesh(const GLMesh &mesh)
     m_program->setUniformValue("uModel", model);
     m_program->setUniformValue("uColor", color);
 
+    bool hasTex = (mesh.texId != 0) && !m_colorOverrides.contains(mesh.name);
+    m_program->setUniformValue("uHasTex", hasTex);
+    if (hasTex) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, mesh.texId);
+        m_program->setUniformValue("uTex", 0);
+    }
+
     glBindVertexArray(mesh.vao);
     glDrawArrays(GL_TRIANGLES, 0, mesh.vertexCount);
     glBindVertexArray(0);
+
+    if (hasTex)
+        glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 QMatrix4x4 ModelGLView::wheelModelMatrix(const GLMesh &mesh) const

@@ -16,7 +16,7 @@
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-// box.obj has no separate wheel sub-objects; leave empty so no mesh tinting
+// robot.obj has no separate wheel sub-objects; leave empty so no mesh tinting
 // is applied and wheel rotation skips gracefully.
 static const QStringList WHEEL_OBJECT_NAMES = {};
 static const QStringList WHEEL_LABELS = { "FL", "FR", "RL" };
@@ -52,7 +52,7 @@ static QString colorToCSS(const QVector3D &c)
 
 static QString findModelFile()
 {
-    const QString name = QStringLiteral("box.obj");
+    const QString name = QStringLiteral("robot.obj");
     const QStringList candidates = {
         QCoreApplication::applicationDirPath() + "/" + name,
         QCoreApplication::applicationDirPath() + "/../" + name,
@@ -224,8 +224,8 @@ void RobotModelWidget::startLoading()
 {
     QString path = findModelFile();
     if (path.isEmpty()) {
-        m_loadLabel->setText("Model file not found (box.obj)");
-        Logger::instance().warning("RobotModelWidget: box.obj not found");
+        m_loadLabel->setText("Model file not found (robot.obj)");
+        Logger::instance().warning("RobotModelWidget: robot.obj not found");
         m_stack->setCurrentIndex(2);
         return;
     }
@@ -344,7 +344,8 @@ void RobotModelWidget::updateWheelStatus(const QString &robotStatus)
     for (int i = 0; i < 3; ++i) {
         m_wheelDots[i]->setStyleSheet("font-size:11px; font-weight:bold; " + css);
 #ifdef HAVE_QT_OPENGL
-        m_glView->setColorOverride(WHEEL_OBJECT_NAMES[i], color3d);
+        if (i < WHEEL_OBJECT_NAMES.size())
+            m_glView->setColorOverride(WHEEL_OBJECT_NAMES[i], color3d);
 #endif
     }
 }

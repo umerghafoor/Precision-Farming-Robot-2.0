@@ -76,6 +76,15 @@ make -j$(nproc)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}=== Build completed successfully! ===${NC}"
     echo -e "Executable: ${YELLOW}$(pwd)/PrecisionFarmingDesktopClient${NC}"
+
+    # Copy 3D model assets next to the executable so the app can find them
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    for asset in robot.obj robot.mtl robot.png; do
+        if [ -f "${SCRIPT_DIR}/${asset}" ]; then
+            cp "${SCRIPT_DIR}/${asset}" "$(pwd)/${asset}"
+        fi
+    done
+
     echo ""
     echo "To run the application:"
     echo -e "  ${YELLOW}./build/PrecisionFarmingDesktopClient${NC}"

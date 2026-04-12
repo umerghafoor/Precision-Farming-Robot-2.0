@@ -16,6 +16,7 @@ struct GLMesh {
     QString   name;
     GLuint    vao          = 0;
     GLuint    vbo          = 0;
+    GLuint    texId        = 0;   // 0 = no texture
     int       vertexCount  = 0;
     QVector3D centroid;
     QVector3D defaultColor { 0.58f, 0.60f, 0.63f };  // neutral steel-gray
