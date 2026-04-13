@@ -17,6 +17,12 @@
 #define SERVO_DEFAULT_ANGLE 90
 #define SERVO_STEP_ANGLE 5
 
+// For continuous-rotation servos, these are stop (neutral) pulse angles.
+// Tune each servo if it still creeps while commanded to stop.
+#define SERVO1_NEUTRAL_ANGLE 90
+#define SERVO2_NEUTRAL_ANGLE 90
+#define SERVO_NEUTRAL_DEADBAND 3
+
 #define LED_PIN 13     // Onboard LED
 
 // 6D Signal Structure:

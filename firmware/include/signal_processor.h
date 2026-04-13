@@ -26,6 +26,6 @@ void process6DSignal();
 void checkSerialData();
 
 // Handle text commands from serial
-void handleTextCommand(String cmd);
+void handleTextCommand(const char *cmd);
 
 #endif

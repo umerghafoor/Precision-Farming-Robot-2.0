@@ -16,6 +16,10 @@ void setServo2Angle(int angle);
 void adjustServo1(int delta);
 void adjustServo2(int delta);
 
+// Stop helpers (especially useful for continuous-rotation servos).
+void stopServo1();
+void stopServo2();
+
 // Read current cached angles.
 int getServo1Angle();
 int getServo2Angle();

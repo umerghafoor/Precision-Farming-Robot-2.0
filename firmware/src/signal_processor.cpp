@@ -1,4 +1,7 @@
 #include "signal_processor.h"
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
 
 // 6D Signal buffer
 byte signalBuffer[SIGNAL_SIZE];
@@ -7,6 +10,31 @@ bool dataReady = false;
 
 // Motor control array
 MotorControl motors[3];
+
+static constexpr size_t COMMAND_BUFFER_SIZE = 32;
+static char commandBuffer[COMMAND_BUFFER_SIZE];
+
+static bool parseServoAngleCommand(const char *cmd, const char *prefix, int *angleOut) {
+  const size_t prefixLen = strlen(prefix);
+  if (strncmp(cmd, prefix, prefixLen) != 0) {
+    return false;
+  }
+
+  const char *value = cmd + prefixLen;
+  if (*value == '\0') {
+    return false;
+  }
+
+  for (size_t i = 0; value[i] != '\0'; i++) {
+    char c = value[i];
+    if (!isdigit(static_cast<unsigned char>(c)) && !(i == 0 && (c == '+' || c == '-'))) {
+      return false;
+    }
+  }
+
+  *angleOut = atoi(value);
+  return true;
+}
 
 void process6DSignal() {
   Serial.println("\n--- Processing 6D Signal ---");
@@ -49,10 +77,10 @@ void checkSerialData() {
 
   // Prioritize text commands first so they are not consumed as binary payload.
   char first = Serial.peek();
-  if ((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z')) {
-    String cmd = Serial.readStringUntil('\n');
-    cmd.trim();
-    handleTextCommand(cmd);
+  if (isalpha(static_cast<unsigned char>(first))) {
+    const size_t bytesRead = Serial.readBytesUntil('\n', commandBuffer, COMMAND_BUFFER_SIZE - 1);
+    commandBuffer[bytesRead] = '\0';
+    handleTextCommand(commandBuffer);
     return;
   }
 
@@ -79,39 +107,81 @@ void checkSerialData() {
   }
 }
 
-void handleTextCommand(String cmd) {
-  cmd.trim();
-  cmd.toUpperCase();
+void handleTextCommand(const char *cmdIn) {
+  if (cmdIn == nullptr) {
+    return;
+  }
+
+  char cmd[COMMAND_BUFFER_SIZE];
+  size_t writeIdx = 0;
+  for (size_t i = 0; cmdIn[i] != '\0' && writeIdx < COMMAND_BUFFER_SIZE - 1; i++) {
+    char c = cmdIn[i];
+    if (!isspace(static_cast<unsigned char>(c))) {
+      cmd[writeIdx++] = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+    }
+  }
+  cmd[writeIdx] = '\0';
+
+  if (cmd[0] == '\0') {
+    return;
+  }
 
   Serial.print("DEBUG: Serial command received: ");
   Serial.println(cmd);
+
+  int requestedAngle = 0;
+  if (parseServoAngleCommand(cmd, "S1:", &requestedAngle)) {
+    Serial.print("DEBUG: Servo 1 absolute angle request -> ");
+    Serial.println(requestedAngle);
+    setServo1Angle(requestedAngle);
+    return;
+  }
+
+  if (parseServoAngleCommand(cmd, "S2:", &requestedAngle)) {
+    Serial.print("DEBUG: Servo 2 absolute angle request -> ");
+    Serial.println(requestedAngle);
+    setServo2Angle(requestedAngle);
+    return;
+  }
+
+  if (strcmp(cmd, "S1STOP") == 0) {
+    Serial.println("DEBUG: Servo 1 stop requested");
+    stopServo1();
+    return;
+  }
+
+  if (strcmp(cmd, "S2STOP") == 0) {
+    Serial.println("DEBUG: Servo 2 stop requested");
+    stopServo2();
+    return;
+  }
   
-  if (cmd == "STOP" || cmd == "X") {
+  if (strcmp(cmd, "STOP") == 0 || strcmp(cmd, "X") == 0) {
     Serial.println("DEBUG: Emergency stop commanded!");
     stopAllMotors();
-  } else if (cmd == "Q") {
+  } else if (strcmp(cmd, "Q") == 0) {
     Serial.println("DEBUG: Servo 1 step left");
     adjustServo1(-SERVO_STEP_ANGLE);
-  } else if (cmd == "A") {
+  } else if (strcmp(cmd, "A") == 0) {
     Serial.println("DEBUG: Servo 1 step right");
     adjustServo1(SERVO_STEP_ANGLE);
-  } else if (cmd == "W") {
+  } else if (strcmp(cmd, "W") == 0) {
     Serial.println("DEBUG: Servo 2 step left");
     adjustServo2(-SERVO_STEP_ANGLE);
-  } else if (cmd == "S") {
+  } else if (strcmp(cmd, "S") == 0) {
     Serial.println("DEBUG: Servo 2 step right");
     adjustServo2(SERVO_STEP_ANGLE);
-  } else if (cmd == "Z") {
+  } else if (strcmp(cmd, "Z") == 0) {
     Serial.println("DEBUG: Servo 2 step left");
     adjustServo2(-SERVO_STEP_ANGLE);
-  } else if (cmd == "C") {
+  } else if (strcmp(cmd, "C") == 0) {
     Serial.println("DEBUG: Servo 2 step right");
     adjustServo2(SERVO_STEP_ANGLE);
-  } else if (cmd == "CENTER") {
+  } else if (strcmp(cmd, "CENTER") == 0) {
     Serial.println("DEBUG: Centering both servos");
-    setServo1Angle(SERVO_DEFAULT_ANGLE);
-    setServo2Angle(SERVO_DEFAULT_ANGLE);
-  } else if (cmd == "TEST") {
+    stopServo1();
+    stopServo2();
+  } else if (strcmp(cmd, "TEST") == 0) {
     Serial.println("DEBUG: Running test sequence...");
     // Test sequence
     setMotor1(DIR_FORWARD, 128);
@@ -122,10 +192,14 @@ void handleTextCommand(String cmd) {
     delay(2000);
     stopAllMotors();
     Serial.println("DEBUG: Test complete");
-  } else if (cmd == "STATUS") {
+  } else if (strcmp(cmd, "STATUS") == 0) {
     Serial.println("\n=== SYSTEM STATUS ===");
     Serial.print("Buffer Index: ");
     Serial.println(bufferIndex);
+    Serial.print("Servo 1 angle: ");
+    Serial.println(getServo1Angle());
+    Serial.print("Servo 2 angle: ");
+    Serial.println(getServo2Angle());
     Serial.println("Last 6D Signal:");
     for (int i = 0; i < SIGNAL_SIZE; i++) {
       Serial.print("  Byte ");
@@ -134,19 +208,19 @@ void handleTextCommand(String cmd) {
       Serial.println(signalBuffer[i], HEX);
     }
     Serial.println("=====================\n");
-  } else if (cmd == "LEFT") {
+  } else if (strcmp(cmd, "LEFT") == 0) {
     Serial.println("DEBUG: Turning left");
     turnLeft(150);
-  } else if (cmd == "RIGHT") {
+  } else if (strcmp(cmd, "RIGHT") == 0) {
     Serial.println("DEBUG: Turning right");
     turnRight(150);
-  } else if (cmd == "FORWARD") {
+  } else if (strcmp(cmd, "FORWARD") == 0) {
     Serial.println("DEBUG: Moving forward");
     moveForward(180);
-  } else if (cmd == "BACKWARD") {
+  } else if (strcmp(cmd, "BACKWARD") == 0) {
     Serial.println("DEBUG: Moving backward");
     moveBackward(180);
   } else {
-    Serial.println("DEBUG: Unknown command. Available: Q, A, W, S, X/STOP, CENTER, Z, C, TEST, STATUS, FORWARD, BACKWARD, LEFT, RIGHT");
+    Serial.println("DEBUG: Unknown command. Available: Q, A, W, S, S1:<0-180>, S2:<0-180>, S1STOP, S2STOP, X/STOP, CENTER, Z, C, TEST, STATUS, FORWARD, BACKWARD, LEFT, RIGHT");
   }
 }

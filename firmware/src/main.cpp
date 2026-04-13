@@ -9,16 +9,37 @@
  */
 
 #include <Arduino.h>
+#include <avr/io.h>
 #include "constants.h"
 #include "motor_control.h"
 #include "servo_control.h"
 #include "signal_processor.h"
 
+static void printResetCause() {
+  const uint8_t flags = MCUSR;
+  MCUSR = 0;
+
+  Serial.print(F("DEBUG: Reset flags=0x"));
+  Serial.println(flags, HEX);
+
+  if (flags == 0) {
+    Serial.println(F("DEBUG: Reset cause unknown (power already stable)"));
+    return;
+  }
+
+  if (flags & _BV(PORF)) Serial.println(F("DEBUG: Power-on reset detected"));
+  if (flags & _BV(EXTRF)) Serial.println(F("DEBUG: External reset pin triggered"));
+  if (flags & _BV(BORF)) Serial.println(F("DEBUG: Brown-out reset detected (possible power dip)"));
+  if (flags & _BV(WDRF)) Serial.println(F("DEBUG: Watchdog reset detected"));
+}
+
 void setup() {
   Serial.begin(115200);
+  delay(50);
   Serial.println("\n========================================");
   Serial.println("Four Wheel Drive - USB Serial Motor Controller");
   Serial.println("========================================\n");
+  printResetCause();
   
   // Initialize all motor pins
   initMotors();
