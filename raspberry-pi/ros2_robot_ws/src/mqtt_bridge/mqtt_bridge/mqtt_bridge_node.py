@@ -6,17 +6,20 @@ ROS2 → MQTT topic mapping:
   /robot_status         → robot/status       (string passthrough)
   /detections/results   → robot/detections   (JSON + cached odom position)
   /odom                 → robot/odom         (x, y, theta, vx, heading_deg, timestamp)
-  /camera/detection     → robot/image        (JPEG base64, throttled)
+    /camera/detection     → robot/image        (base64 image, throttled; png/jpeg)
   /imu/data             → robot/imu          (heading, roll, pitch, accel, gyro, timestamp)
 
 Parameters:
   mqtt_host        (string, default: "localhost")
   mqtt_port        (int,    default: 1883)
   mqtt_keepalive   (int,    default: 60)
+    camera_detection_topic (string, default: "/camera/detection")
+    camera_detection_transport (string, default: "auto") — "auto", "raw", or "compressed"
   odom_rate_hz     (float,  default: 1.0)   — max rate to publish odometry
   image_rate_hz    (float,  default: 0.5)   — max rate to publish camera frames (2 s interval)
   imu_rate_hz      (float,  default: 1.0)   — max rate to publish IMU data
-  image_quality    (int,    default: 60)    — JPEG quality 1-95 (lower = smaller payload)
+    image_format     (string, default: "png") — "png" (lossless) or "jpeg"
+    image_quality    (int,    default: 95)    — JPEG quality 1-95 (used only when image_format=jpeg)
 """
 
 import base64
@@ -28,7 +31,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import Image, Imu
+from sensor_msgs.msg import CompressedImage, Image, Imu
 from std_msgs.msg import String
 
 try:
@@ -52,10 +55,13 @@ class MqttBridgeNode(Node):
         self.declare_parameter('mqtt_host', 'localhost')
         self.declare_parameter('mqtt_port', 1883)
         self.declare_parameter('mqtt_keepalive', 60)
+        self.declare_parameter('camera_detection_topic', '/camera/detection')
+        self.declare_parameter('camera_detection_transport', 'auto')
         self.declare_parameter('odom_rate_hz', 1.0)
         self.declare_parameter('image_rate_hz', 0.5)
         self.declare_parameter('imu_rate_hz', 1.0)
-        self.declare_parameter('image_quality', 60)
+        self.declare_parameter('image_format', 'png')
+        self.declare_parameter('image_quality', 95)
 
         host = self.get_parameter('mqtt_host').value
         port = self.get_parameter('mqtt_port').value
@@ -63,7 +69,22 @@ class MqttBridgeNode(Node):
         odom_rate = self.get_parameter('odom_rate_hz').value
         image_rate = self.get_parameter('image_rate_hz').value
         imu_rate = self.get_parameter('imu_rate_hz').value
+        self._camera_detection_topic = str(self.get_parameter('camera_detection_topic').value)
+        self._camera_detection_transport = str(self.get_parameter('camera_detection_transport').value).strip().lower()
+        self._image_format = str(self.get_parameter('image_format').value).strip().lower()
         self._image_quality = int(self.get_parameter('image_quality').value)
+
+        if self._camera_detection_transport not in ('auto', 'raw', 'compressed'):
+            self.get_logger().warning(
+                f'Unsupported camera_detection_transport={self._camera_detection_transport}; defaulting to auto'
+            )
+            self._camera_detection_transport = 'auto'
+
+        if self._image_format not in ('png', 'jpeg'):
+            self.get_logger().warning(
+                f'Unsupported image_format={self._image_format}; defaulting to png (lossless)'
+            )
+            self._image_format = 'png'
 
         self._mqtt_host = host
         self._mqtt_port = port
@@ -109,7 +130,7 @@ class MqttBridgeNode(Node):
         self.create_subscription(String, '/robot_status', self._on_status, 10)
         self.create_subscription(String, '/detections/results', self._on_detections, 10)
         self.create_subscription(Odometry, '/odom', self._on_odom, 10)
-        self.create_subscription(Image, '/camera/detection', self._on_camera_detection, 10)
+        self._setup_camera_detection_subscription()
         self.create_subscription(Imu, '/imu/data', self._on_imu, 10)
 
         self._status_pub = self.create_publisher(String, '/mqtt_bridge/status', 10)
@@ -117,7 +138,7 @@ class MqttBridgeNode(Node):
 
         self.get_logger().info(
             f'MQTT bridge started → {host}:{port} '
-            f'| image@{image_rate}Hz quality={self._image_quality} '
+            f'| image@{image_rate}Hz format={self._image_format} quality={self._image_quality} '
             f'| imu@{imu_rate}Hz | odom@{odom_rate}Hz'
         )
 
@@ -181,6 +202,42 @@ class MqttBridgeNode(Node):
             self._mqtt.publish(topic, payload, qos=0, retain=False)
         except Exception as e:
             self.get_logger().warning(f'MQTT publish error on {topic}: {e}')
+
+    def _setup_camera_detection_subscription(self):
+        image_type = 'sensor_msgs/msg/Image'
+        compressed_type = 'sensor_msgs/msg/CompressedImage'
+        topic_types = {name: types for name, types in self.get_topic_names_and_types()}
+        available_types = topic_types.get(self._camera_detection_topic, [])
+
+        use_compressed = False
+        if self._camera_detection_transport == 'compressed':
+            use_compressed = True
+        elif self._camera_detection_transport == 'raw':
+            use_compressed = False
+        else:
+            use_compressed = compressed_type in available_types and image_type not in available_types
+
+        if use_compressed:
+            self.create_subscription(
+                CompressedImage,
+                self._camera_detection_topic,
+                self._on_camera_detection_compressed,
+                10,
+            )
+            mode = 'compressed'
+        else:
+            self.create_subscription(
+                Image,
+                self._camera_detection_topic,
+                self._on_camera_detection,
+                10,
+            )
+            mode = 'raw'
+
+        self.get_logger().info(
+            f'Camera detection subscription: topic={self._camera_detection_topic} mode={mode} '
+            f'(requested={self._camera_detection_transport}, discovered_types={available_types})'
+        )
 
     # ── ROS2 subscribers ─────────────────────────────────────────────────────
 
@@ -246,11 +303,26 @@ class MqttBridgeNode(Node):
 
             pil_img = PilImage.fromarray(arr, 'RGB')
             buf = io.BytesIO()
-            pil_img.save(buf, format='JPEG', quality=self._image_quality)
-            img_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+            if self._image_format == 'jpeg':
+                pil_img.save(buf, format='JPEG', quality=self._image_quality)
+                mime_type = 'image/jpeg'
+                format_name = 'jpeg'
+                format_specific_key = 'image_jpeg_b64'
+            else:
+                pil_img.save(buf, format='PNG', optimize=False)
+                mime_type = 'image/png'
+                format_name = 'png'
+                format_specific_key = 'image_png_b64'
+
+            img_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
 
             payload = json.dumps({
-                'image_jpeg_b64': img_b64,
+                'image_b64': img_b64,
+                format_specific_key: img_b64,
+                'image_encoding': 'base64',
+                'image_format': format_name,
+                'mime_type': mime_type,
                 'width': msg.width,
                 'height': msg.height,
                 'timestamp': int(time.time()),
@@ -258,6 +330,59 @@ class MqttBridgeNode(Node):
             self._publish('robot/image', payload)
         except Exception as e:
             self.get_logger().warning(f'Image encoding error: {e}')
+
+    def _on_camera_detection_compressed(self, msg: CompressedImage):
+        if not IMAGE_LIBS_AVAILABLE:
+            return
+        now = time.monotonic()
+        if now - self._last_image_time < self._image_min_interval:
+            return
+        self._last_image_time = now
+
+        try:
+            raw = bytes(msg.data)
+            fmt = (msg.format or '').strip().lower()
+
+            if 'png' in fmt:
+                format_name = 'png'
+                mime_type = 'image/png'
+                format_specific_key = 'image_png_b64'
+                encoded_bytes = raw
+            elif 'jpeg' in fmt or 'jpg' in fmt:
+                format_name = 'jpeg'
+                mime_type = 'image/jpeg'
+                format_specific_key = 'image_jpeg_b64'
+                encoded_bytes = raw
+            else:
+                pil_img = PilImage.open(io.BytesIO(raw)).convert('RGB')
+                buf = io.BytesIO()
+                if self._image_format == 'jpeg':
+                    pil_img.save(buf, format='JPEG', quality=self._image_quality)
+                    format_name = 'jpeg'
+                    mime_type = 'image/jpeg'
+                    format_specific_key = 'image_jpeg_b64'
+                else:
+                    pil_img.save(buf, format='PNG', optimize=False)
+                    format_name = 'png'
+                    mime_type = 'image/png'
+                    format_specific_key = 'image_png_b64'
+                encoded_bytes = buf.getvalue()
+
+            img_b64 = base64.b64encode(encoded_bytes).decode('ascii')
+
+            payload = json.dumps({
+                'image_b64': img_b64,
+                format_specific_key: img_b64,
+                'image_encoding': 'base64',
+                'image_format': format_name,
+                'mime_type': mime_type,
+                'width': None,
+                'height': None,
+                'timestamp': int(time.time()),
+            })
+            self._publish('robot/image', payload)
+        except Exception as e:
+            self.get_logger().warning(f'Compressed image encoding error: {e}')
 
     def _on_imu(self, msg: Imu):
         now = time.monotonic()
