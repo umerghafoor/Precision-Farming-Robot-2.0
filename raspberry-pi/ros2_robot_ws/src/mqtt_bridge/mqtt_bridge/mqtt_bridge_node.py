@@ -4,7 +4,7 @@ MQTT Bridge Node — bridges ROS2 topics to MQTT for the weedx mobile backend.
 
 ROS2 → MQTT topic mapping:
   /robot_status         → robot/status       (string passthrough)
-  /detections/results   → robot/detections   (JSON + cached odom position)
+  /detections/results   → robot/detections   (JSON + cached odom position, throttled)
   /odom                 → robot/odom         (x, y, theta, vx, heading_deg, timestamp)
     /camera/detection     → robot/image        (base64 image, throttled; png/jpeg)
   /imu/data             → robot/imu          (heading, roll, pitch, accel, gyro, timestamp)
@@ -15,9 +15,10 @@ Parameters:
   mqtt_keepalive   (int,    default: 60)
     camera_detection_topic (string, default: "/camera/detection")
     camera_detection_transport (string, default: "auto") — "auto", "raw", or "compressed"
-  odom_rate_hz     (float,  default: 1.0)   — max rate to publish odometry
-  image_rate_hz    (float,  default: 0.5)   — max rate to publish camera frames (2 s interval)
-  imu_rate_hz      (float,  default: 1.0)   — max rate to publish IMU data
+  odom_rate_hz       (float,  default: 1.0)   — max rate to publish odometry
+  image_rate_hz      (float,  default: 0.5)   — max rate to publish camera frames (2 s interval)
+  imu_rate_hz        (float,  default: 1.0)   — max rate to publish IMU data
+  detection_rate_hz  (float,  default: 1.0)   — max rate to publish detections
     image_format     (string, default: "png") — "png" (lossless) or "jpeg"
     image_quality    (int,    default: 95)    — JPEG quality 1-95 (used only when image_format=jpeg)
 """
@@ -60,6 +61,7 @@ class MqttBridgeNode(Node):
         self.declare_parameter('odom_rate_hz', 1.0)
         self.declare_parameter('image_rate_hz', 0.5)
         self.declare_parameter('imu_rate_hz', 1.0)
+        self.declare_parameter('detection_rate_hz', 1.0)
         self.declare_parameter('image_format', 'png')
         self.declare_parameter('image_quality', 95)
 
@@ -69,6 +71,7 @@ class MqttBridgeNode(Node):
         odom_rate = self.get_parameter('odom_rate_hz').value
         image_rate = self.get_parameter('image_rate_hz').value
         imu_rate = self.get_parameter('imu_rate_hz').value
+        detection_rate = self.get_parameter('detection_rate_hz').value
         self._camera_detection_topic = str(self.get_parameter('camera_detection_topic').value)
         self._camera_detection_transport = str(self.get_parameter('camera_detection_transport').value).strip().lower()
         self._image_format = str(self.get_parameter('image_format').value).strip().lower()
@@ -92,10 +95,12 @@ class MqttBridgeNode(Node):
         self._odom_min_interval = 1.0 / max(odom_rate, 0.1)
         self._image_min_interval = 1.0 / max(image_rate, 0.1)
         self._imu_min_interval = 1.0 / max(imu_rate, 0.1)
+        self._detection_min_interval = 1.0 / max(detection_rate, 0.1)
 
         self._last_odom_time = 0.0
         self._last_image_time = 0.0
         self._last_imu_time = 0.0
+        self._last_detection_time = 0.0
         self._last_odom: dict = {}
 
         self._mqtt_connected = False
@@ -139,7 +144,7 @@ class MqttBridgeNode(Node):
         self.get_logger().info(
             f'MQTT bridge started → {host}:{port} '
             f'| image@{image_rate}Hz format={self._image_format} quality={self._image_quality} '
-            f'| imu@{imu_rate}Hz | odom@{odom_rate}Hz'
+            f'| imu@{imu_rate}Hz | odom@{odom_rate}Hz | detections@{detection_rate}Hz'
         )
 
     # ── MQTT callbacks ────────────────────────────────────────────────────────
@@ -245,6 +250,11 @@ class MqttBridgeNode(Node):
         self._publish('robot/status', msg.data)
 
     def _on_detections(self, msg: String):
+        now = time.monotonic()
+        if now - self._last_detection_time < self._detection_min_interval:
+            return
+        self._last_detection_time = now
+
         try:
             data = json.loads(msg.data)
         except json.JSONDecodeError:
@@ -332,8 +342,6 @@ class MqttBridgeNode(Node):
             self.get_logger().warning(f'Image encoding error: {e}')
 
     def _on_camera_detection_compressed(self, msg: CompressedImage):
-        if not IMAGE_LIBS_AVAILABLE:
-            return
         now = time.monotonic()
         if now - self._last_image_time < self._image_min_interval:
             return
@@ -354,6 +362,13 @@ class MqttBridgeNode(Node):
                 format_specific_key = 'image_jpeg_b64'
                 encoded_bytes = raw
             else:
+                # Unknown format — needs PIL to re-encode
+                if not IMAGE_LIBS_AVAILABLE:
+                    self.get_logger().warning(
+                        f'Cannot bridge image with format "{fmt}": numpy/Pillow not installed. '
+                        'Run: pip3 install numpy Pillow'
+                    )
+                    return
                 pil_img = PilImage.open(io.BytesIO(raw)).convert('RGB')
                 buf = io.BytesIO()
                 if self._image_format == 'jpeg':

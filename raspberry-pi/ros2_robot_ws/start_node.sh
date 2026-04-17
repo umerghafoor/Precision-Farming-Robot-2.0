@@ -165,7 +165,10 @@ action_all_nodes() {
     -p mqtt_host:="$MQTT_HOST" \
     -p mqtt_port:="$MQTT_PORT" \
     -p mqtt_keepalive:="$MQTT_KEEPALIVE" \
-    -p odom_rate_hz:="$ODOM_RATE_HZ"
+    -p odom_rate_hz:="$ODOM_RATE_HZ" \
+    -p camera_detection_transport:=compressed \
+    -p image_format:=jpeg \
+    -p image_quality:=80
 
   echo ""
   echo "All nodes started. Press Ctrl+C to stop all."
@@ -183,7 +186,10 @@ action_mqtt_only() {
     -p mqtt_host:="$MQTT_HOST" \
     -p mqtt_port:="$MQTT_PORT" \
     -p mqtt_keepalive:="$MQTT_KEEPALIVE" \
-    -p odom_rate_hz:="$ODOM_RATE_HZ"
+    -p odom_rate_hz:="$ODOM_RATE_HZ" \
+    -p camera_detection_transport:=compressed \
+    -p image_format:=jpeg \
+    -p image_quality:=80
 }
 
 case "$MODE" in

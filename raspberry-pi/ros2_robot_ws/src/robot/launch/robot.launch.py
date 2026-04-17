@@ -114,8 +114,9 @@ def generate_launch_description():
                 {'odom_rate_hz': 1.0},
                 {'image_rate_hz': 0.5},   # annotated detection frames → robot/image
                 {'imu_rate_hz': 1.0},     # IMU heading/accel/gyro → robot/imu
-                {'image_format': 'png'},  # UTF-8 JSON + base64 PNG (lossless)
-                {'image_quality': 95},    # used only when image_format='jpeg'
+                {'image_format': 'jpeg'}, # JPEG is smaller and faster over MQTT
+                {'image_quality': 80},    # good quality/size balance
+                {'camera_detection_transport': 'compressed'},  # /camera/detection is CompressedImage (YOLO output)
             ],
             emulate_tty=True,
         ),
