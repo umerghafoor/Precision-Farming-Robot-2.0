@@ -1,5 +1,9 @@
 #include "robot_controller/robot_controller.hpp"
 
+#include <cmath>
+#include <chrono>
+#include <functional>
+
 RobotController::RobotController() : Node("robot_controller") {
   // Declare parameters
   this->declare_parameter("control_loop_rate", 20.0);  // Hz
@@ -7,6 +11,7 @@ RobotController::RobotController() : Node("robot_controller") {
   this->declare_parameter("max_linear_velocity", 1.0);  // m/s
   this->declare_parameter("max_angular_velocity", 2.0); // rad/s
   this->declare_parameter("min_battery_voltage", 7.0);  // 7V minimum for safety
+  this->declare_parameter("command_timeout", 1.0);      // seconds
 
   // Create subscribers
   cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
@@ -18,6 +23,9 @@ RobotController::RobotController() : Node("robot_controller") {
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "/odom", 10, std::bind(&RobotController::odometryCallback, this, std::placeholders::_1));
 
+  battery_sub_ = this->create_subscription<std_msgs::msg::Float32>(
+      "/battery_voltage", 10, std::bind(&RobotController::batteryCallback, this, std::placeholders::_1));
+
   // Create publishers
   motor_cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_filtered", 10);
   status_pub_ = this->create_publisher<std_msgs::msg::String>("/robot_status", 10);
@@ -26,6 +34,8 @@ RobotController::RobotController() : Node("robot_controller") {
   double control_rate = this->get_parameter("control_loop_rate").as_double();
   auto period = std::chrono::milliseconds(static_cast<int>(1000.0 / control_rate));
   control_timer_ = this->create_wall_timer(period, std::bind(&RobotController::controlLoop, this));
+
+  last_cmd_time_ = this->now();
 
   RCLCPP_INFO(this->get_logger(), "Robot Controller initialized with control loop rate: %.1f Hz",
               control_rate);
@@ -53,6 +63,7 @@ void RobotController::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr 
   }
 
   current_cmd_vel_ = clamped_cmd;
+  last_cmd_time_ = this->now();
 
   RCLCPP_DEBUG(this->get_logger(),
                "Velocity command - linear_x: %.2f m/s, angular_z: %.2f rad/s",
@@ -70,8 +81,13 @@ void RobotController::imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
 
 void RobotController::odometryCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
   // Process odometry for position tracking
-  RCLCPP_DEBUG(this->get_logger(), "Odometry - Position: [%.3f, %.3f]", 
+  RCLCPP_DEBUG(this->get_logger(), "Odometry - Position: [%.3f, %.3f]",
                msg->pose.pose.position.x, msg->pose.pose.position.y);
+}
+
+void RobotController::batteryCallback(const std_msgs::msg::Float32::SharedPtr msg) {
+  battery_voltage_ = msg->data;
+  RCLCPP_DEBUG(this->get_logger(), "Battery voltage: %.2f V", battery_voltage_);
 }
 
 void RobotController::controlLoop() {
@@ -82,6 +98,16 @@ void RobotController::controlLoop() {
                  battery_voltage_, min_voltage);
     emergencyStop();
     return;
+  }
+
+  // Check command timeout — stop if no cmd_vel received recently
+  double timeout = this->get_parameter("command_timeout").as_double();
+  double elapsed = (this->now() - last_cmd_time_).seconds();
+  if (elapsed > timeout) {
+    if (!is_emergency_stop_ && (current_cmd_vel_.linear.x != 0.0 || current_cmd_vel_.angular.z != 0.0)) {
+      RCLCPP_WARN(this->get_logger(), "Command timeout (%.2f s). Stopping robot.", elapsed);
+      current_cmd_vel_ = geometry_msgs::msg::Twist{};
+    }
   }
 
   // Publish motor commands
@@ -102,6 +128,10 @@ void RobotController::publishStatus(const std::string& status) {
 }
 
 void RobotController::emergencyStop() {
+  if (!this->get_parameter("emergency_stop_enabled").as_bool()) {
+    RCLCPP_WARN(this->get_logger(), "Emergency stop triggered but is disabled by parameter.");
+    return;
+  }
   is_emergency_stop_ = true;
   geometry_msgs::msg::Twist stop_cmd;
   motor_cmd_pub_->publish(stop_cmd);
