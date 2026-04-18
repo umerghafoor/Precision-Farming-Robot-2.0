@@ -3,6 +3,73 @@
 #include <cmath>
 #include <chrono>
 #include <functional>
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <cstring>
+
+// Simple Serial Port Wrapper
+class SerialPort {
+public:
+  SerialPort(const std::string& port, int baudrate) : port_name_(port), fd_(-1) {
+    fd_ = open(port.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
+    if (fd_ < 0) {
+      throw std::runtime_error("Failed to open serial port: " + port);
+    }
+
+    termios tty;
+    if (tcgetattr(fd_, &tty) != 0) {
+      close(fd_);
+      fd_ = -1;
+      throw std::runtime_error("Failed to get serial attributes");
+    }
+
+    // Set baudrate
+    cfsetispeed(&tty, B115200);
+    cfsetospeed(&tty, B115200);
+
+    // 8N1, no flow control
+    tty.c_cflag &= ~PARENB;
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;
+    tty.c_cflag &= ~CRTSCTS;
+    tty.c_cflag |= CREAD | CLOCAL;
+
+    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+    tty.c_oflag &= ~OPOST;
+
+    tty.c_cc[VMIN] = 0;
+    tty.c_cc[VTIME] = 0;
+
+    if (tcsetattr(fd_, TCSANOW, &tty) != 0) {
+      close(fd_);
+      fd_ = -1;
+      throw std::runtime_error("Failed to set serial attributes");
+    }
+
+    usleep(2000000);  // Wait for Arduino reset
+  }
+
+  ~SerialPort() {
+    if (fd_ >= 0) {
+      close(fd_);
+    }
+  }
+
+  bool write(const uint8_t* data, size_t len) {
+    if (fd_ < 0) return false;
+    ssize_t n = ::write(fd_, data, len);
+    return (n == static_cast<ssize_t>(len));
+  }
+
+  bool is_open() const { return fd_ >= 0; }
+
+private:
+  std::string port_name_;
+  int fd_;
+};
 
 RobotController::RobotController() : Node("robot_controller") {
   // Declare parameters
@@ -12,6 +79,8 @@ RobotController::RobotController() : Node("robot_controller") {
   this->declare_parameter("max_angular_velocity", 2.0); // rad/s
   this->declare_parameter("min_battery_voltage", 7.0);  // 7V minimum for safety
   this->declare_parameter("command_timeout", 1.0);      // seconds
+  this->declare_parameter("serial_port", std::string("/dev/ttyUSB0"));
+  this->declare_parameter("wheel_separation", 0.2);     // meters
 
   // Create subscribers
   cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
@@ -27,8 +96,19 @@ RobotController::RobotController() : Node("robot_controller") {
       "/battery_voltage", 10, std::bind(&RobotController::batteryCallback, this, std::placeholders::_1));
 
   // Create publishers
-  motor_cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_filtered", 10);
   status_pub_ = this->create_publisher<std_msgs::msg::String>("/robot_status", 10);
+
+  // Initialize serial connection
+  if (!initSerialConnection()) {
+    RCLCPP_ERROR(this->get_logger(), "Failed to initialize serial connection");
+    publishStatus("SERIAL_ERROR");
+  } else {
+    serial_connected_ = true;
+    RCLCPP_INFO(this->get_logger(), "Serial connection established");
+  }
+
+  // Get parameters for motor control
+  wheel_separation_ = this->get_parameter("wheel_separation").as_double();
 
   // Create control loop timer
   double control_rate = this->get_parameter("control_loop_rate").as_double();
@@ -40,6 +120,12 @@ RobotController::RobotController() : Node("robot_controller") {
   RCLCPP_INFO(this->get_logger(), "Robot Controller initialized with control loop rate: %.1f Hz",
               control_rate);
   publishStatus("INITIALIZED");
+}
+
+RobotController::~RobotController() {
+  if (serial_port_) {
+    serial_port_.reset();
+  }
 }
 
 void RobotController::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {
@@ -110,13 +196,14 @@ void RobotController::controlLoop() {
     }
   }
 
-  // Publish motor commands
-  if (!is_emergency_stop_) {
-    motor_cmd_pub_->publish(current_cmd_vel_);
-  } else {
-    // Publish zero velocities during emergency stop
-    geometry_msgs::msg::Twist stop_cmd;
-    motor_cmd_pub_->publish(stop_cmd);
+  // Convert twist to motor commands and send to Arduino
+  if (!is_emergency_stop_ && serial_connected_) {
+    uint8_t motor1_dir, motor1_speed, motor2_dir, motor2_speed;
+    twistToMotorCommands(current_cmd_vel_, motor1_dir, motor1_speed, motor2_dir, motor2_speed);
+    send6DSignal(motor1_dir, motor1_speed, motor2_dir, motor2_speed, DIR_STOP, 0);
+  } else if (is_emergency_stop_ && serial_connected_) {
+    // Send stop command to all motors
+    send6DSignal(DIR_STOP, 0, DIR_STOP, 0, DIR_STOP, 0);
   }
 }
 
@@ -133,10 +220,62 @@ void RobotController::emergencyStop() {
     return;
   }
   is_emergency_stop_ = true;
-  geometry_msgs::msg::Twist stop_cmd;
-  motor_cmd_pub_->publish(stop_cmd);
   publishStatus("EMERGENCY_STOP");
   RCLCPP_ERROR(this->get_logger(), "EMERGENCY STOP ACTIVATED!");
+}
+
+bool RobotController::initSerialConnection() {
+  try {
+    std::string port = this->get_parameter("serial_port").as_string();
+    serial_port_ = std::make_unique<SerialPort>(port, 115200);
+    RCLCPP_INFO(this->get_logger(), "Serial port opened: %s", port.c_str());
+    return true;
+  } catch (const std::exception& e) {
+    RCLCPP_ERROR(this->get_logger(), "Serial connection error: %s", e.what());
+    return false;
+  }
+}
+
+bool RobotController::send6DSignal(uint8_t dir1, uint8_t speed1, uint8_t dir2, uint8_t speed2,
+                                   uint8_t dir3, uint8_t speed3) {
+  if (!serial_port_ || !serial_port_->is_open()) {
+    return false;
+  }
+
+  uint8_t signal[6] = {dir1, speed1, dir2, speed2, dir3, speed3};
+  return serial_port_->write(signal, 6);
+}
+
+void RobotController::twistToMotorCommands(const geometry_msgs::msg::Twist& twist,
+                                          uint8_t& motor1_dir, uint8_t& motor1_speed,
+                                          uint8_t& motor2_dir, uint8_t& motor2_speed) {
+  double max_linear = this->get_parameter("max_linear_velocity").as_double();
+  double linear_x = twist.linear.x;
+  double angular_z = twist.angular.z;
+
+  // Differential drive: v_left = linear - (angular * L/2), v_right = linear + (angular * L/2)
+  double L = wheel_separation_;
+  double v_left = linear_x - (angular_z * L / 2.0);
+  double v_right = linear_x + (angular_z * L / 2.0);
+
+  // Normalize to max linear velocity
+  double max_wheel_speed = std::max(std::abs(v_left), std::abs(v_right));
+  if (max_wheel_speed > max_linear) {
+    v_left = (v_left / max_wheel_speed) * max_linear;
+    v_right = (v_right / max_wheel_speed) * max_linear;
+  }
+
+  // Motor 1 (Left wheel)
+  motor1_dir = (v_left >= 0.0) ? DIR_FORWARD : DIR_BACKWARD;
+  motor1_speed = static_cast<uint8_t>(std::min(255.0, std::abs(v_left) / max_linear * 255.0));
+
+  // Motor 2 (Right wheel)
+  motor2_dir = (v_right >= 0.0) ? DIR_FORWARD : DIR_BACKWARD;
+  motor2_speed = static_cast<uint8_t>(std::min(255.0, std::abs(v_right) / max_linear * 255.0));
+
+  RCLCPP_DEBUG(this->get_logger(),
+               "Motor commands - M1: dir=%d speed=%d, M2: dir=%d speed=%d",
+               motor1_dir, motor1_speed, motor2_dir, motor2_speed);
 }
 
 int main(int argc, char * argv[]) {

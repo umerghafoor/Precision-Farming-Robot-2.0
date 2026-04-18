@@ -17,8 +17,8 @@ class WebcamNode(Node):
         super().__init__('webcam_node')
 
         self.declare_parameter('device_index',     0)
-        self.declare_parameter('image_width',      640)
-        self.declare_parameter('image_height',     480)
+        self.declare_parameter('image_width',      1920)
+        self.declare_parameter('image_height',     1080)
         self.declare_parameter('publish_rate',     10.0)
         self.declare_parameter('frame_id',         'camera_link')
         self.declare_parameter('camera_topic',     '/camera/raw')
