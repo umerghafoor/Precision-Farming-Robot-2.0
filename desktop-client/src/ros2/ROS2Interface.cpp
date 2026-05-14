@@ -141,7 +141,8 @@ void ROS2Interface::setupPublishers()
     m_servo1Publisher = m_node->create_publisher<std_msgs::msg::Int16>("/servo1/angle", 10);
     m_servo2Publisher = m_node->create_publisher<std_msgs::msg::Int16>("/servo2/angle", 10);
 
-    // Laser service client
+    // Laser: publish Bool to /laser/cmd (primary) and keep service client for /laser/set
+    m_laserCmdPublisher = m_node->create_publisher<std_msgs::msg::Bool>("/laser/cmd", 10);
     m_laserClient = m_node->create_client<std_srvs::srv::SetBool>("/laser/set");
 
     Logger::instance().debug("ROS2 publishers created");
@@ -386,10 +387,18 @@ void ROS2Interface::publishServoAngle(int servoId, int angle)
 void ROS2Interface::publishLaserCommand(bool on)
 {
 #ifdef USE_ROS2
-    if (!m_laserClient) return;
-    auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
-    req->data = on;
-    m_laserClient->async_send_request(req);
+    // Primary path: topic publish — works even if imu_node isn't up yet
+    if (m_laserCmdPublisher) {
+        auto msg = std_msgs::msg::Bool();
+        msg.data = on;
+        m_laserCmdPublisher->publish(msg);
+    }
+    // Secondary path: service call (imu_node also subscribes via /laser/set)
+    if (m_laserClient && m_laserClient->service_is_ready()) {
+        auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+        req->data = on;
+        m_laserClient->async_send_request(req);
+    }
 #else
     Logger::instance().debug(QString("Laser command (stub): %1").arg(on ? "ON" : "OFF"));
 #endif

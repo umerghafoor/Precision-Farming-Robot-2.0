@@ -17,6 +17,7 @@
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/int16.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 #endif
 
@@ -111,7 +112,8 @@ private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr m_commandPublisher;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr m_servo1Publisher;
     rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr m_servo2Publisher;
-    rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr  m_laserClient;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr   m_laserCmdPublisher;
+    rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr   m_laserClient;
 
     // Subscribers
     mutable QMutex m_imageSubscriptionMutex;

@@ -229,23 +229,13 @@ void SPIControllerBridge::cmdVelCallback(
 void SPIControllerBridge::servo1Callback(
   const std_msgs::msg::Int16::SharedPtr msg)
 {
-  const uint8_t angle = clampServoAngle(static_cast<int>(msg->data));
-  servo1_angle_ = angle;
-  if (angle != prev_servo1_angle_) {
-    sendServoCommand(1, angle);
-    prev_servo1_angle_ = angle;
-  }
+  servo1_angle_ = clampServoAngle(static_cast<int>(msg->data));
 }
 
 void SPIControllerBridge::servo2Callback(
   const std_msgs::msg::Int16::SharedPtr msg)
 {
-  const uint8_t angle = clampServoAngle(static_cast<int>(msg->data));
-  servo2_angle_ = angle;
-  if (angle != prev_servo2_angle_) {
-    sendServoCommand(2, angle);
-    prev_servo2_angle_ = angle;
-  }
+  servo2_angle_ = clampServoAngle(static_cast<int>(msg->data));
 }
 
 void SPIControllerBridge::transmitTimerCallback() {
@@ -257,6 +247,18 @@ void SPIControllerBridge::transmitTimerCallback() {
   }
 
   if (serial_fd_ < 0) return;  // no hardware — silent
+
+  // Send servo text commands first (only on change), then the binary motor packet.
+  // Both go through write_mutex_ inside sendServoCommand / transmitPacket — keep
+  // them sequential here so they never interleave on the wire.
+  if (servo1_angle_ != prev_servo1_angle_) {
+    sendServoCommand(1, servo1_angle_);
+    prev_servo1_angle_ = servo1_angle_;
+  }
+  if (servo2_angle_ != prev_servo2_angle_) {
+    sendServoCommand(2, servo2_angle_);
+    prev_servo2_angle_ = servo2_angle_;
+  }
 
   const auto packet = buildPacket();
   if (!transmitPacket(packet)) {
