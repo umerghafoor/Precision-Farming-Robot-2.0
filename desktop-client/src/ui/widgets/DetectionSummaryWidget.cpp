@@ -3,8 +3,9 @@
 #include "Logger.h"
 
 #include <QVBoxLayout>
-#include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
+#include <QFrame>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -23,39 +24,85 @@ DetectionSummaryWidget::~DetectionSummaryWidget()
 {
 }
 
+// Creates a KPI stat card: big monospace value + small uppercase label
+static QFrame* makeStatCard(const QString& label, QLabel*& valueOut, QWidget* parent)
+{
+    QFrame* card = new QFrame(parent);
+    card->setObjectName("summaryStatCard");
+    card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    QVBoxLayout* lay = new QVBoxLayout(card);
+    lay->setContentsMargins(12, 12, 12, 10);
+    lay->setSpacing(4);
+
+    lay->addStretch(1);
+
+    valueOut = new QLabel("0", card);
+    valueOut->setObjectName("summaryStatValue");
+    valueOut->setAlignment(Qt::AlignCenter);
+    lay->addWidget(valueOut);
+
+    QLabel* nameLabel = new QLabel(label.toUpper(), card);
+    nameLabel->setObjectName("summaryStatLabel");
+    nameLabel->setAlignment(Qt::AlignCenter);
+    nameLabel->setWordWrap(true);
+    lay->addWidget(nameLabel);
+
+    lay->addStretch(1);
+    return card;
+}
+
 void DetectionSummaryWidget::setupUI()
 {
-    QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(12, 12, 12, 12);
-    mainLayout->setSpacing(10);
+    QVBoxLayout* root = new QVBoxLayout(this);
+    root->setContentsMargins(10, 10, 10, 10);
+    root->setSpacing(8);
 
-    QGridLayout* grid = new QGridLayout();
-    grid->setHorizontalSpacing(10);
-    grid->setVerticalSpacing(8);
+    // ── Row 1: three primary KPI cards ───────────────────────────────────
+    QHBoxLayout* row1 = new QHBoxLayout();
+    row1->setSpacing(8);
+    row1->addWidget(makeStatCard("Total\nDetections", m_totalDetectionsValue, this));
+    row1->addWidget(makeStatCard("Frames\nProcessed",  m_framesValue,         this));
+    row1->addWidget(makeStatCard("Avg /\nFrame",       m_averagePerFrameValue, this));
 
-    auto addRow = [grid](int row, const QString& labelText, QLabel*& valueLabel) {
-        QLabel* label = new QLabel(labelText);
-        label->setStyleSheet("font-weight: 600;");
-        valueLabel = new QLabel("0");
-        valueLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // ── Row 2: two secondary KPI cards ───────────────────────────────────
+    QHBoxLayout* row2 = new QHBoxLayout();
+    row2->setSpacing(8);
+    row2->addWidget(makeStatCard("Current\nFrame",     m_lastFrameCountValue,  this));
+    row2->addWidget(makeStatCard("Unique\nClasses",    m_uniqueClassesValue,   this));
+    row2->addStretch(1);   // keep cards from stretching to fill 2-col width
 
-        grid->addWidget(label, row, 0, Qt::AlignTop);
-        grid->addWidget(valueLabel, row, 1);
-    };
+    // ── Row 3: top class banner ───────────────────────────────────────────
+    QFrame* topClassCard = new QFrame(this);
+    topClassCard->setObjectName("summaryTopClass");
+    topClassCard->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
-    addRow(0, "Total Detections:", m_totalDetectionsValue);
-    addRow(1, "Frames Processed:", m_framesValue);
-    addRow(2, "Avg / Frame:", m_averagePerFrameValue);
-    addRow(3, "Unique Classes:", m_uniqueClassesValue);
-    addRow(4, "Top Class:", m_topClassValue);
-    addRow(5, "Current Frame Count:", m_lastFrameCountValue);
+    QHBoxLayout* topLay = new QHBoxLayout(topClassCard);
+    topLay->setContentsMargins(14, 10, 14, 10);
+    topLay->setSpacing(8);
 
-    grid->setColumnStretch(1, 1);
+    QLabel* topIcon = new QLabel(topClassCard);
+    topIcon->setObjectName("summaryTopIcon");
+    topIcon->setText("TOP");
 
-    mainLayout->addLayout(grid);
-    mainLayout->addStretch(1);
+    QLabel* topLabel = new QLabel("Top Class", topClassCard);
+    topLabel->setObjectName("summaryTopLabel");
 
-    setMinimumSize(320, 220);
+    m_topClassValue = new QLabel("-", topClassCard);
+    m_topClassValue->setObjectName("summaryTopClassName");
+    m_topClassValue->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_topClassValue->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+    topLay->addWidget(topIcon);
+    topLay->addWidget(topLabel);
+    topLay->addWidget(m_topClassValue);
+
+    // ── Assemble ──────────────────────────────────────────────────────────
+    root->addLayout(row1, 3);
+    root->addLayout(row2, 2);
+    root->addWidget(topClassCard);
+
+    setMinimumSize(320, 240);
 }
 
 bool DetectionSummaryWidget::initialize()
@@ -108,10 +155,9 @@ void DetectionSummaryWidget::updateLabels()
     int topCount = -1;
     for (auto it = m_classCounts.constBegin(); it != m_classCounts.constEnd(); ++it) {
         if (it.value() > topCount) {
-            topClass = QString("%1 (%2)").arg(it.key()).arg(it.value());
+            topClass = QString("%1  (%2)").arg(it.key()).arg(it.value());
             topCount = it.value();
         }
     }
-
     m_topClassValue->setText(topClass);
 }

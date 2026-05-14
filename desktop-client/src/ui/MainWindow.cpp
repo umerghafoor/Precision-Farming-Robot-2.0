@@ -74,6 +74,7 @@ void MainWindow::createMenus()
     // widgetsMenu->addAction(tr("Add &Command Control"), this, &MainWindow::onAddCommandControl);
     // widgetsMenu->addAction(tr("Add &Motion Control"), this, &MainWindow::onAddMotionControl);
     widgetsMenu->addAction(tr("Add &Sensor Data"), this, &MainWindow::onAddSensorData);
+    widgetsMenu->addAction(tr("Add &Detection Panel"), this, &MainWindow::onAddDetectionPanel);
     widgetsMenu->addAction(tr("Add Current &Detection"), this, &MainWindow::onAddCurrentDetection);
     widgetsMenu->addAction(tr("Add Detection &Summary"), this, &MainWindow::onAddDetectionSummary);
     widgetsMenu->addAction(tr("Add C&oordinates"), this, &MainWindow::onAddCoordinates);
@@ -91,11 +92,20 @@ void MainWindow::createMenus()
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
     helpMenu->addAction(tr("&About"), this, &MainWindow::onAbout);
 
-    // create persistent badges container
+    // right corner: connect button + ROS2 status badge
     QWidget *badgeContainer = new QWidget(this);
     QHBoxLayout *badgeLayout = new QHBoxLayout(badgeContainer);
-    badgeLayout->setContentsMargins(0,0,0,0);
-    badgeLayout->setSpacing(8);
+    badgeLayout->setContentsMargins(0, 0, 10, 0);
+    badgeLayout->setSpacing(10);
+
+    m_connectBtn = new QToolButton(this);
+    m_connectBtn->setObjectName("connectButton");
+    m_connectBtn->setText(tr("Connect"));
+    m_connectBtn->setCheckable(true);
+    m_connectBtn->setToolTip(tr("Connect / disconnect ROS2"));
+    connect(m_connectBtn, &QToolButton::clicked, this, &MainWindow::onToggleROS2Connection);
+    badgeLayout->addWidget(m_connectBtn);
+
     m_ros2Badge = new StatusBadge(tr("ROS2 Offline"), this);
     badgeLayout->addWidget(m_ros2Badge);
     badgeContainer->setObjectName("appBarBadgeContainer");
@@ -111,16 +121,10 @@ void MainWindow::createMenus()
 
 void MainWindow::createToolBar()
 {
+    // Connect button moved to navbar — toolbar not needed
     QToolBar* toolbar = addToolBar(tr("Main Toolbar"));
     toolbar->setMovable(false);
-
-    toolbar->addSeparator();
-    toolbar->addAction(m_connectAction);
-    // style hook: name the underlying toolbutton created for the connect action
-    if (auto btn = qobject_cast<QToolButton*>(toolbar->widgetForAction(m_connectAction))) {
-        btn->setObjectName("connectButton");
-    }
-
+    toolbar->hide();
 }
 
 void MainWindow::createStatusBar()
@@ -175,8 +179,7 @@ void MainWindow::createDefaultLayout()
     // onAddTwinVisualization(); // Disabled: Digital Twin widget hidden
     onAddSidebar();          // right sidebar unified control panel
     onAddSensorData();       // bottom telemetry bar
-    onAddCurrentDetection(); // right column detection details
-    onAddDetectionSummary(); // right column cumulative metrics
+    onAddDetectionPanel();   // right column — merged detection details + cumulative metrics
 
     // Enforce proportions: video should be ~3× wider than sidebar
     if (m_dockWidgets.contains("Video Stream") && m_dockWidgets.contains("Controls")) {
@@ -361,7 +364,13 @@ void MainWindow::onAddDetectionSummary()
     addWidgetToDock(widget, "Detection Summary");
 }
 
+void MainWindow::onAddDetectionPanel()
+{
+    if (!m_widgetManager) return;
 
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::DetectionPanel, this);
+    addWidgetToDock(widget, "Detection");
+}
 
 void MainWindow::onAddTwinVisualization()
 {
@@ -385,11 +394,11 @@ void MainWindow::onToggleROS2Connection()
 {
     if (!m_ros2Interface) {
         QMessageBox::warning(this, tr("Error"), tr("ROS2 interface not initialized"));
-        m_connectAction->setChecked(false);
+        if (m_connectBtn) m_connectBtn->setChecked(false);
         return;
     }
 
-    if (m_connectAction->isChecked()) {
+    if (!m_ros2Connected) {
         m_ros2Interface->start();
         statusBar()->showMessage(tr("Connecting to ROS2..."), 2000);
     } else {
@@ -417,6 +426,19 @@ bool MainWindow::restoreLayout()
         restoreGeometry(settings.value("windowGeometry").toByteArray());
         restoreState(settings.value("windowState").toByteArray());
 
+        // Qt creates plain QDockWidget placeholders for any dock widget names in
+        // the saved state that don't exist in the current layout (e.g. a widget
+        // the user added manually in a previous session). Those placeholders are
+        // not MaterialDockWidget instances, so they lack our event() override and
+        // crash on mouse events via a null drag-state access in QDockWidget::event().
+        // Remove them immediately after restoring.
+        for (QDockWidget* dw : findChildren<QDockWidget*>()) {
+            if (!qobject_cast<MaterialDockWidget*>(dw)) {
+                removeDockWidget(dw);
+                dw->deleteLater();
+            }
+        }
+
         return true;
     }
     return false;
@@ -439,9 +461,14 @@ void MainWindow::onROS2Connected()
     Logger::instance().info("MainWindow: ROS2 connected, updating badge");
     statusBar()->showMessage(tr("ROS2 Connected"), 3000);
     m_ros2Connected = true;
+    m_connectAction->setChecked(true);
+    if (m_connectBtn) {
+        m_connectBtn->setChecked(true);
+        m_connectBtn->setText(tr("Disconnect"));
+    }
     if (m_ros2Badge) {
         m_ros2Badge->setText(tr("ROS2 Connected"));
-        m_ros2Badge->setDotColor(QColor("#52C44A")); // live green
+        m_ros2Badge->setDotColor(QColor("#22C55E"));
     }
 }
 
@@ -450,9 +477,14 @@ void MainWindow::onROS2Disconnected()
     Logger::instance().info("MainWindow: ROS2 disconnected, updating badge");
     statusBar()->showMessage(tr("ROS2 Disconnected"), 3000);
     m_ros2Connected = false;
+    m_connectAction->setChecked(false);
+    if (m_connectBtn) {
+        m_connectBtn->setChecked(false);
+        m_connectBtn->setText(tr("Connect"));
+    }
     if (m_ros2Badge) {
         m_ros2Badge->setText(tr("ROS2 Offline"));
-        m_ros2Badge->setDotColor(QColor("#7A9B79")); // grey
+        m_ros2Badge->setDotColor(QColor("#9CA3AF"));
     }
 }
 

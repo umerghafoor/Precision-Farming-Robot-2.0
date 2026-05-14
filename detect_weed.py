@@ -7,6 +7,7 @@ Usage:
 
 from pathlib import Path
 import argparse
+import shutil
 import sys
 
 
@@ -15,8 +16,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image", required=True, help="Path to input image")
     parser.add_argument(
         "--model",
-        default="yolo26n.pt",
-        help="Path to YOLO model (.pt). Default: yolo26n.pt",
+        default="yolo.pt",
+        help="Path to YOLO model (.pt). Default: yolo.pt",
     )
     parser.add_argument(
         "--conf",
@@ -53,6 +54,14 @@ def parse_args() -> argparse.Namespace:
             "Default: inferred as not_<positive_output>"
         ),
     )
+    parser.add_argument(
+        "--annotated-output",
+        default=None,
+        help=(
+            "Path to save annotated image. "
+            "Default: <input_stem>_annotated<input_suffix>"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -69,6 +78,12 @@ def main() -> int:
     if not model_path.exists() or not model_path.is_file():
         print(f"Model not found: {model_path}", file=sys.stderr)
         return 1
+
+    if args.annotated_output is not None:
+        annotated_output = Path(args.annotated_output)
+    else:
+        output_suffix = image_path.suffix if image_path.suffix else ".jpg"
+        annotated_output = image_path.with_name(f"{image_path.stem}_annotated{output_suffix}")
 
     try:
         from ultralytics import YOLO
@@ -93,6 +108,22 @@ def main() -> int:
     model = YOLO(str(model_path))
     results = model(str(image_path), conf=args.conf, verbose=False)
 
+    try:
+        annotated_output.parent.mkdir(parents=True, exist_ok=True)
+        if results:
+            annotated_frame = results[0].plot()
+            from cv2 import imwrite
+
+            saved_ok = imwrite(str(annotated_output), annotated_frame)
+            if not saved_ok:
+                print(f"Failed to save annotated image: {annotated_output}", file=sys.stderr)
+                return 1
+        else:
+            shutil.copy2(image_path, annotated_output)
+    except Exception as exc:
+        print(f"Failed to create annotated image: {exc}", file=sys.stderr)
+        return 1
+
     detected_classes = []
     for result in results:
         if result.boxes is None:
@@ -113,6 +144,7 @@ def main() -> int:
     is_target_detected = has_target_label or (single_class_model and has_any_detection)
 
     print(positive_output if is_target_detected else negative_output)
+    print(f"Annotated image: {annotated_output}", file=sys.stderr)
     return 0
 
 

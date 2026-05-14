@@ -28,7 +28,7 @@ class YOLODetectionNode(Node):
 
         # Declare parameters
         self.declare_parameter('model_path', '')
-        self.declare_parameter('confidence_threshold', 0.5)
+        self.declare_parameter('confidence_threshold', 0.2)
         self.declare_parameter('iou_threshold', 0.45)
         self.declare_parameter('input_size', 640)
         self.declare_parameter('camera_topic', '/camera/color_jpeg')
@@ -213,7 +213,7 @@ class YOLODetectionNode(Node):
                 seen_dirs.add(directory)
                 ordered_dirs.append(directory)
 
-        explicit_names = ('yolo26n.pt', 'best.pt')
+        explicit_names = ('yolo8n.pt', 'best.pt')
         for directory in ordered_dirs:
             for model_name in explicit_names:
                 candidate = os.path.join(directory, model_name)
@@ -254,18 +254,7 @@ class YOLODetectionNode(Node):
 
     def _get_coco_classes(self):
         """Get COCO dataset class names"""
-        return [
-            'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck',
-            'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench',
-            'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-            'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis',
-            'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove',
-            'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
-            'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange',
-            'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-            'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse',
-            'remote', 'keyboard', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator',
-            'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+        return ['weed', 'crop'
         ]
 
     def _decode_compressed_camera_msg(self, msg: CompressedImage):
@@ -312,6 +301,9 @@ class YOLODetectionNode(Node):
 
             if self.model is not None:
                 detections = self.run_inference(cv_image)
+                if detections is None:
+                    self.get_logger().debug('Skipping publish because inference did not complete')
+                    return
                 annotated_image = self.draw_detections(cv_image, detections)
 
                 if self.annotated_is_compressed:
@@ -344,21 +336,7 @@ class YOLODetectionNode(Node):
                 if self.enable_viz:
                     self.get_logger().debug(f'Detected {len(detections)} objects')
             else:
-                # If no model, just republish the original image
-                if self.annotated_is_compressed:
-                    ok, encoded = cv2.imencode('.jpg', cv_image)
-                    if not ok:
-                        raise ValueError('Failed to JPEG-encode passthrough frame')
-                    annotated_msg = CompressedImage()
-                    annotated_msg.header = header
-                    annotated_msg.format = 'jpeg'
-                    annotated_msg.data = encoded.tobytes()
-                else:
-                    annotated_msg = self.cv_bridge.cv2_to_imgmsg(cv_image, encoding='bgr8')
-                    annotated_msg.header = header
-                for label, publisher, message in [('annotated image', self.annotated_pub, annotated_msg)]:
-                    publisher.publish(message)
-                    print(f'Published {label}', flush=True)
+                self.get_logger().debug('Skipping publish because YOLO model is not loaded')
 
         except Exception as e:
             self.get_logger().error(f'Error processing camera frame: {e}')
@@ -418,6 +396,7 @@ class YOLODetectionNode(Node):
                         })
         except Exception as e:
             self.get_logger().debug(f'Inference error: {e}')
+            return None
 
         return detections
 

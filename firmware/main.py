@@ -73,17 +73,6 @@ class MotorController:
 
         print("WARNING: Attempting serial reconnect after write failure...")
         return self._connect_serial(is_initial=False)
-
-    def _read_arduino_output(self, wait_s=0.2):
-        """Read and print any pending Arduino serial lines for a short window."""
-        if self.serial is None or not self.serial.is_open:
-            return
-
-        time.sleep(wait_s)
-        while self.serial.in_waiting > 0:
-            response = self.serial.readline().decode('utf-8', errors='ignore').strip()
-            if response:
-                print(f"  Arduino: {response}")
     
     def send_6d_signal(self, motor1_dir, motor1_speed, motor2_dir, motor2_speed, motor3_dir, motor3_speed):
         """
@@ -124,7 +113,11 @@ class MotorController:
                 print("DEBUG: Data sent successfully")
 
                 # Read Arduino's debug output
-                self._read_arduino_output(wait_s=0.2)
+                time.sleep(0.2)  # Give Arduino time to process and respond
+                while self.serial.in_waiting > 0:
+                    response = self.serial.readline().decode('utf-8', errors='ignore').strip()
+                    if response:
+                        print(f"  Arduino: {response}")
 
                 return True
             except Exception as e:
@@ -148,7 +141,6 @@ class MotorController:
                 self.serial.write(payload)
                 self.serial.flush()
                 print(f"DEBUG: Text command sent -> {command.strip().upper()}")
-                self._read_arduino_output(wait_s=0.12)
                 return True
             except Exception as e:
                 if attempt == 0 and self._handle_write_failure(e):
@@ -315,12 +307,6 @@ class KeyboardController:
             if angle is not None:
                 print(f"\n[KEYBOARD] N -> SERVO 2 ANGLE {angle}")
                 self.controller.set_servo_angle(2, angle)
-        elif key in (ord('u'), ord('U')):
-            print("\n[KEYBOARD] U -> SERVO 1 STOP")
-            self.controller.send_text_command("S1STOP")
-        elif key in (ord('i'), ord('I')):
-            print("\n[KEYBOARD] I -> SERVO 2 STOP")
-            self.controller.send_text_command("S2STOP")
         elif key == 27:  # ESC
             print("\n[KEYBOARD] ESC -> EXIT")
             self.controller.stop_all()
@@ -335,7 +321,7 @@ def main(stdscr):
     stdscr.nodelay(True)  # Non-blocking input
     stdscr.keypad(True)
 
-    print("Ready! Controls: Arrow keys=drive, E/D=speed +/- , Q/A=servo1 left/right, W/S=servo2 left/right, M=servo1 absolute value, N=servo2 absolute value, U=servo1 stop, I=servo2 stop, R=center servos, SPACE/X=stop, ESC=exit")
+    print("Ready! Controls: Arrow keys=drive, E/D=speed +/- , Q/A=servo1 left/right, W/S=servo2 left/right, M=servo1 absolute angle, N=servo2 absolute angle, R=center servos, SPACE/X=stop, ESC=exit")
     
     # Initialize your motor controller
     controller = MotorController(port="/dev/ttyUSB0", baudrate=115200)

@@ -132,6 +132,35 @@ void MaterialDockWidget::updateFullscreenButton()
     }
 }
 
+bool MaterialDockWidget::event(QEvent* event)
+{
+    // QTBUG-43698: QDockWidget::event() crashes on MouseMove when its internal
+    // drag state (d->state) was never created.  The drag state is created only
+    // when QDockWidget itself receives MouseButtonPress.  DockTitleBar ignores
+    // presses on its empty area so they propagate here, but QToolButton children
+    // (Float/Close/Fullscreen buttons) absorb the press before DockTitleBar sees
+    // it, leaving QDockWidget without a press — and any subsequent MouseMove
+    // triggers the null-state crash.
+    //
+    // Guard: only let MouseMove reach QDockWidget::event() when we actually saw
+    // the matching press.  Non-move events always go through normally.
+    switch (event->type()) {
+        case QEvent::MouseButtonPress:
+            m_dockSawPress = true;
+            break;
+        case QEvent::MouseButtonRelease:
+            m_dockSawPress = false;
+            break;
+        case QEvent::MouseMove:
+            if (!m_dockSawPress)
+                return QWidget::event(event);   // skip QDockWidget drag machinery
+            break;
+        default:
+            break;
+    }
+    return QDockWidget::event(event);
+}
+
 void MaterialDockWidget::keyPressEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_Escape && (windowState() & Qt::WindowFullScreen)) {

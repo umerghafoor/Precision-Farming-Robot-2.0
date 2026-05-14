@@ -111,5 +111,24 @@ def generate_launch_description():
             emulate_tty=True,
         ),
 
+        Node(
+            package='mqtt_bridge',
+            executable='mqtt_bridge_node',
+            name='mqtt_bridge_node',
+            output='screen',
+            parameters=[
+                {'mqtt_host': 'sanilinux.mullet-bull.ts.net'},
+                {'mqtt_port': 1883},
+                {'mqtt_keepalive': 60},
+                {'odom_rate_hz': 1.0},
+                {'image_rate_hz': 0.5},   # annotated detection frames → robot/image
+                {'imu_rate_hz': 1.0},     # IMU heading/accel/gyro → robot/imu
+                {'image_format': 'jpeg'}, # JPEG is smaller and faster over MQTT
+                {'image_quality': 80},    # good quality/size balance
+                {'camera_detection_transport': 'compressed'},  # /camera/detection is CompressedImage (YOLO output)
+            ],
+            emulate_tty=True,
+        ),
+
         LogInfo(msg="All nodes started successfully!"),
     ])
