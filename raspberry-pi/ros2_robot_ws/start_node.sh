@@ -156,6 +156,16 @@ action_webcam_only() {
 }
 
 action_all_nodes() {
+  if ! resolve_video_device; then
+    exit 1
+  fi
+  local device_index
+  if ! device_index="$(device_path_to_index "$SELECTED_VIDEO_DEVICE")"; then
+    echo "ERROR: Could not extract device index from $SELECTED_VIDEO_DEVICE"
+    echo "Set WEBCAM_DEVICE_INDEX explicitly (example: WEBCAM_DEVICE_INDEX=1)"
+    exit 1
+  fi
+
   start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge --ros-args \
     -p cmd_vel_topic:=/cmd_vel \
     -p servo1_topic:=/servo1/angle \
@@ -173,13 +183,15 @@ action_all_nodes() {
     -p update_rate:=50.0 \
     -p i2c_bus:=1 \
     -p i2c_address:=0x68
-  start_node camera_node ros2 run camera_sensor camera_node --ros-args \
-    -p video_device:="$VIDEO_DEVICE" \
+  start_node webcam_node ros2 run camera_sensor webcam_node --ros-args \
+    -p device_index:="$device_index" \
     -p image_width:=640 \
     -p image_height:=480 \
-    -p publish_rate:=30.0 \
+    -p publish_rate:=10.0 \
     -p frame_id:=camera_link \
-    -p camera_topic:=/camera/raw
+    -p camera_topic:=/camera/raw \
+    -p color_jpeg_topic:=/camera/color_jpeg \
+    -p jpeg_quality:=80
   start_node yolo_detection_node ros2 run yolo_detection yolo_detection_node --ros-args \
     -p confidence_threshold:=0.25 \
     -p iou_threshold:=0.45 \
@@ -212,7 +224,7 @@ action_all_nodes() {
 
   echo ""
   echo "All nodes started. Press Ctrl+C to stop all."
-  echo "Camera topic: /camera/raw"
+  echo "Camera topics: /camera/raw (gray compressed) | /camera/color_jpeg (JPEG)"
   echo ""
   wait
 }
