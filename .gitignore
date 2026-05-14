@@ -16,3 +16,12 @@ desktop-client/core.264
 desktop-client/core.259
 
 .github
+build
+install
+log
+yolo26n.pt
+*.pyc
+WE3DS*
+output_gt
+yolo_we3ds*
+runs

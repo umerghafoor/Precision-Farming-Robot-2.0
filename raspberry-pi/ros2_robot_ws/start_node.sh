@@ -149,11 +149,59 @@ action_webcam_only() {
 }
 
 action_all_nodes() {
-  start_node motor_driver ros2 run motor_control motor_driver
-  start_node imu_node ros2 run imu_sensor imu_node
-  start_node encoder_node ros2 run encoder_odometry encoder_node
-  start_node robot_controller ros2 run robot_controller robot_controller
-  start_node camera_node ros2 run camera_sensor camera_node
+  start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge --ros-args \
+    -p cmd_vel_topic:=/cmd_vel \
+    -p servo1_topic:=/servo1/angle \
+    -p servo2_topic:=/servo2/angle \
+    -p spi_device:=/dev/spidev0.0 \
+    -p spi_mode:=0 \
+    -p spi_bits_per_word:=8 \
+    -p spi_speed_hz:=500000 \
+    -p wheel_base:=0.2 \
+    -p max_linear_velocity:=1.0 \
+    -p cmd_timeout_sec:=0.5 \
+    -p tx_rate_hz:=20.0 \
+    -p default_servo_angle:=90
+  start_node imu_node ros2 run imu_sensor imu_node --ros-args \
+    -p update_rate:=50.0 \
+    -p i2c_bus:=1 \
+    -p i2c_address:=0x68
+  start_node camera_node ros2 run camera_sensor camera_node --ros-args \
+    -p video_device:="$VIDEO_DEVICE" \
+    -p image_width:=640 \
+    -p image_height:=480 \
+    -p publish_rate:=30.0 \
+    -p frame_id:=camera_link \
+    -p camera_topic:=/camera/raw
+  start_node yolo_detection_node ros2 run yolo_detection yolo_detection_node --ros-args \
+    -p confidence_threshold:=0.25 \
+    -p iou_threshold:=0.45 \
+    -p input_size:=640 \
+    -p camera_topic:=/camera/raw \
+    -p annotated_topic:=/camera/detection \
+    -p results_topic:=/detections/results \
+    -p enable_visualization:=true
+  start_node encoder_node ros2 run encoder_odometry encoder_node --ros-args \
+    -p wheel_radius:=0.05 \
+    -p wheel_base:=0.2 \
+    -p counts_per_rev:=20 \
+    -p update_rate:=20.0
+  start_node robot_controller ros2 run robot_controller robot_controller --ros-args \
+    -p control_loop_rate:=20.0 \
+    -p emergency_stop_enabled:=true \
+    -p max_linear_velocity:=1.0 \
+    -p max_angular_velocity:=2.0 \
+    -p min_battery_voltage:=7.0
+  start_node mqtt_bridge ros2 run mqtt_bridge mqtt_bridge_node --ros-args \
+    -p mqtt_host:="$MQTT_HOST" \
+    -p mqtt_port:="$MQTT_PORT" \
+    -p mqtt_keepalive:="$MQTT_KEEPALIVE" \
+    -p odom_rate_hz:="$ODOM_RATE_HZ" \
+    -p image_rate_hz:=0.5 \
+    -p imu_rate_hz:=1.0 \
+    -p image_format:=jpeg \
+    -p image_quality:=80 \
+    -p camera_detection_transport:=compressed
 
   echo ""
   echo "All nodes started. Press Ctrl+C to stop all."
