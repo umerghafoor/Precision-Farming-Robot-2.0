@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QRadioButton>
 #include <QScrollArea>
+#include <QTimer>
 #include <QMap>
 
 /**
@@ -91,8 +92,9 @@ private:
 
     // pin
     QRadioButton* m_pinRadioButton;
-    bool m_isPinned;
-    Motion m_pinnedMotion;
+    bool     m_isPinned{false};
+    Motion   m_pinnedMotion{Motion::Forward};
+    QTimer*  m_pinTimer{nullptr};  // republishes at 10 Hz while pinned so bridge never times out
 
     // legacy velocity sliders/labels (will serve as read-only feedback later)
     double m_linearSpeed;

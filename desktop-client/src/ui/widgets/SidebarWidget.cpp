@@ -15,7 +15,6 @@ SidebarWidget::SidebarWidget(QWidget *parent)
     , m_maxLinear(1.0)
     , m_maxAngular(1.5)
     , m_radius(1.0)
-    , m_isPinned(false)
     , m_linearSpeed(0.0)
     , m_angularSpeed(0.0)
 {
@@ -160,11 +159,25 @@ void SidebarWidget::setupUI()
     spinLayout->addWidget(m_spinRightButton);
     motionLayout->addLayout(spinLayout);
 
-    // pin radio (keep for now)
+    // pin radio — when checked, the last pressed direction keeps publishing at 10 Hz
     QHBoxLayout* pinLayout = new QHBoxLayout();
     m_pinRadioButton = new QRadioButton("Pin Command");
     pinLayout->addWidget(m_pinRadioButton);
     motionLayout->addLayout(pinLayout);
+
+    m_pinTimer = new QTimer(this);
+    m_pinTimer->setInterval(100);  // 10 Hz — keeps bridge from timing out (bridge timeout = 0.5 s)
+    connect(m_pinTimer, &QTimer::timeout, this, [this]() {
+        if (m_isPinned) sendVelocityFor(m_pinnedMotion);
+    });
+    // Unchecking the radio clears pin and stops the robot
+    connect(m_pinRadioButton, &QRadioButton::toggled, this, [this](bool checked) {
+        if (!checked && m_isPinned) {
+            m_isPinned = false;
+            m_pinTimer->stop();
+            sendStop();
+        }
+    });
 
     motionGroup->setLayout(motionLayout);
     contentLayout->addWidget(motionGroup);
@@ -289,21 +302,30 @@ void SidebarWidget::onMotionPressed()
     QObject* s = sender();
     if (!s) return;
     for (auto it = m_buttons.begin(); it != m_buttons.end(); ++it) {
-        if (it.value() == s) {
-            if (m_pinRadioButton && m_pinRadioButton->isChecked()) {
-                m_isPinned = true;
-                m_pinnedMotion = it.key();
-                sendVelocityFor(m_pinnedMotion);
-            } else {
-                sendVelocityFor(it.key());
+        if (it.value() != s) continue;
+
+        const bool pinChecked = m_pinRadioButton && m_pinRadioButton->isChecked();
+        if (pinChecked) {
+            // Pin this direction: store it, start keepalive timer
+            m_isPinned      = true;
+            m_pinnedMotion  = it.key();
+            m_pinTimer->start();
+            sendVelocityFor(m_pinnedMotion);
+        } else {
+            // Normal momentary press: clear any previous pin, send once
+            if (m_isPinned) {
+                m_isPinned = false;
+                m_pinTimer->stop();
             }
-            return;
+            sendVelocityFor(it.key());
         }
+        return;
     }
 }
 
 void SidebarWidget::onMotionReleased()
 {
+    // Only stop if we are NOT in pin mode — pin keeps going until radio unchecked
     if (!m_isPinned) sendStop();
 }
 
@@ -428,7 +450,12 @@ void SidebarWidget::sendVelocityCommand()
 
 void SidebarWidget::onStopClicked()
 {
-    // reset sliders as well
+    // Clear pin state so the keepalive timer doesn't fight the stop
+    if (m_isPinned) {
+        m_isPinned = false;
+        m_pinTimer->stop();
+        if (m_pinRadioButton) m_pinRadioButton->setChecked(false);
+    }
     m_linearSpeedSlider->setValue(0);
     m_angularSpeedSlider->setValue(0);
     sendStop();
