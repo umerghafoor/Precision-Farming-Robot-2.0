@@ -4,7 +4,7 @@
 #include "BaseWidget.h"
 #include <QLabel>
 #include <QPushButton>
-#include <QTimer>
+#include <QSpinBox>
 #include <QKeyEvent>
 #include <QPointF>
 #include <QImage>
@@ -61,7 +61,6 @@ private slots:
     void onClearCalibration();
     void onTestModeToggled(bool on);
     void onCanvasClicked(QPointF norm);
-    void onServoMoveTimer();
 
 private:
     void setupUI();
@@ -83,6 +82,7 @@ private:
     QPushButton* m_clearBtn;
     QPushButton* m_testBtn;
     QPushButton* m_laserBtn;
+    QSpinBox*    m_stepSpin;
 
     // Calibration state
     // corners[i] = {pixel_x, pixel_y, servo1_angle, servo2_angle}
@@ -100,12 +100,8 @@ private:
     // Current servo angles
     double m_servo1{90}, m_servo2{90};
 
-    // Arrow-key servo step (degrees per keypress)
-    static constexpr double STEP = 1.0;
-
-    // Repeat-move timer for held arrow keys
-    QTimer* m_moveTimer;
-    int     m_pendingDelta1{0}, m_pendingDelta2{0};
+    // Arrow-key servo step (degrees per keypress); adjustable via spinbox
+    int m_step{1};
 
     // Last frame size
     int m_imgW{640}, m_imgH{480};

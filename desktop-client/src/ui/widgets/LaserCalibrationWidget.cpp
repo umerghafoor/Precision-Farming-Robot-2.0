@@ -12,6 +12,7 @@
 #include <QSettings>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QSpinBox>
 #include <cmath>
 
 // ── CalibrationCanvas ─────────────────────────────────────────────────────────
@@ -146,10 +147,7 @@ void CalibrationCanvas::mousePressEvent(QMouseEvent* e) {
 
 LaserCalibrationWidget::LaserCalibrationWidget(QWidget* parent)
     : BaseWidget(parent)
-    , m_moveTimer(new QTimer(this))
 {
-    m_moveTimer->setInterval(50);  // 20 Hz repeat
-    connect(m_moveTimer, &QTimer::timeout, this, &LaserCalibrationWidget::onServoMoveTimer);
     setupUI();
     setFocusPolicy(Qt::StrongFocus);
 }
@@ -171,7 +169,7 @@ void LaserCalibrationWidget::setupUI() {
     m_statusLabel->setStyleSheet("color:#90CAF9;font-weight:bold;padding:4px;");
     root->addWidget(m_statusLabel);
 
-    // Servo readout
+    // Servo readout + step size
     auto* servoRow = new QHBoxLayout;
     m_servo1Label = new QLabel("Servo1: 90°", this);
     m_servo2Label = new QLabel("Servo2: 90°", this);
@@ -180,6 +178,19 @@ void LaserCalibrationWidget::setupUI() {
         l->setStyleSheet("color:#B0BEC5;font-family:monospace;");
         servoRow->addWidget(l);
     }
+
+    auto* stepLabel = new QLabel("Step:", this);
+    stepLabel->setStyleSheet("color:#90A4AE;");
+    m_stepSpin = new QSpinBox(this);
+    m_stepSpin->setRange(1, 20);
+    m_stepSpin->setValue(m_step);
+    m_stepSpin->setSuffix("°");
+    m_stepSpin->setFixedWidth(70);
+    m_stepSpin->setStyleSheet("QSpinBox{background:#263238;color:#CFD8DC;border:1px solid #455A64;border-radius:3px;padding:2px;}");
+    connect(m_stepSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, [this](int v){ m_step = v; });
+    servoRow->addWidget(stepLabel);
+    servoRow->addWidget(m_stepSpin);
     root->addLayout(servoRow);
 
     // ── Corner buttons ────────────────────────────────────────────────────
@@ -441,35 +452,27 @@ void LaserCalibrationWidget::keyPressEvent(QKeyEvent* e) {
         return;
     }
 
-    m_pendingDelta1 = 0;
-    m_pendingDelta2 = 0;
+    // Ignore auto-repeat so holding a key doesn't keep firing
+    if (e->isAutoRepeat()) { e->accept(); return; }
 
+    int d1 = 0, d2 = 0;
     switch (e->key()) {
-        case Qt::Key_Left:  m_pendingDelta1 = -1; break;
-        case Qt::Key_Right: m_pendingDelta1 = +1; break;
-        case Qt::Key_Up:    m_pendingDelta2 = -1; break;
-        case Qt::Key_Down:  m_pendingDelta2 = +1; break;
+        case Qt::Key_Left:  d1 = -1; break;
+        case Qt::Key_Right: d1 = +1; break;
+        case Qt::Key_Up:    d2 = -1; break;
+        case Qt::Key_Down:  d2 = +1; break;
         default: BaseWidget::keyPressEvent(e); return;
     }
 
-    onServoMoveTimer();   // immediate first step
-    if (!m_moveTimer->isActive()) m_moveTimer->start();
-    e->accept();
-}
-
-void LaserCalibrationWidget::onServoMoveTimer() {
-    if (m_pendingDelta1 == 0 && m_pendingDelta2 == 0) {
-        m_moveTimer->stop();
-        return;
-    }
-    m_servo1 = std::max(0.0, std::min(180.0, m_servo1 + m_pendingDelta1 * STEP));
-    m_servo2 = std::max(0.0, std::min(180.0, m_servo2 + m_pendingDelta2 * STEP));
+    m_servo1 = std::max(0.0, std::min(180.0, m_servo1 + d1 * m_step));
+    m_servo2 = std::max(0.0, std::min(180.0, m_servo2 + d2 * m_step));
     if (m_ros2Interface) {
-        if (m_pendingDelta1) m_ros2Interface->publishServoAngle(1, static_cast<int>(m_servo1));
-        if (m_pendingDelta2) m_ros2Interface->publishServoAngle(2, static_cast<int>(m_servo2));
+        if (d1) m_ros2Interface->publishServoAngle(1, static_cast<int>(m_servo1));
+        if (d2) m_ros2Interface->publishServoAngle(2, static_cast<int>(m_servo2));
     }
     m_servo1Label->setText(QString("Servo1: %1°").arg(static_cast<int>(m_servo1)));
     m_servo2Label->setText(QString("Servo2: %1°").arg(static_cast<int>(m_servo2)));
+    e->accept();
 }
 
 void LaserCalibrationWidget::updateStatus() {
