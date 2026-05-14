@@ -220,7 +220,9 @@ void handleTextCommand(const char *cmdIn) {
   } else if (strcmp(cmd, "BACKWARD") == 0) {
     Serial.println("DEBUG: Moving backward");
     moveBackward(180);
+  } else if (strcmp(cmd, "WHOAMI") == 0) {
+    Serial.println("NODE_ID:motor_controller");
   } else {
-    Serial.println("DEBUG: Unknown command. Available: Q, A, W, S, S1:<0-180>, S2:<0-180>, S1STOP, S2STOP, X/STOP, CENTER, Z, C, TEST, STATUS, FORWARD, BACKWARD, LEFT, RIGHT");
+    Serial.println("DEBUG: Unknown command. Available: Q, A, W, S, S1:<0-180>, S2:<0-180>, S1STOP, S2STOP, X/STOP, CENTER, Z, C, TEST, STATUS, FORWARD, BACKWARD, LEFT, RIGHT, WHOAMI");
   }
 }

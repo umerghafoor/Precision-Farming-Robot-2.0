@@ -37,6 +37,7 @@ void setup() {
   Serial.begin(115200);
   delay(50);
   Serial.println("\n========================================");
+  Serial.println("NODE_ID:motor_controller");
   Serial.println("Four Wheel Drive - USB Serial Motor Controller");
   Serial.println("========================================\n");
   printResetCause();

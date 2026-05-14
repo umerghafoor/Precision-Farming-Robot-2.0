@@ -137,6 +137,7 @@ void setup() {
     digitalWrite(LED_PIN, LOW);
 
     Serial.begin(115200);
+    Serial.println(F("NODE_ID:sensor_node"));
     Serial.println(F("Sensor Node — MPU-9250 + Laser"));
     Serial.println(F("Initialising..."));
 
@@ -209,6 +210,8 @@ void loop() {
         } else if (strcmp(buf, "LASER_OFF") == 0) {
             laserOff();
             Serial.println(F("LASER OFF"));
+        } else if (strcmp(buf, "WHOAMI") == 0) {
+            Serial.println(F("NODE_ID:sensor_node"));
         }
     }
 

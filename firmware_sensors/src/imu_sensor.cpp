@@ -16,23 +16,27 @@ ImuInitResult initIMU() {
     setting.accel_fchoice    = 0x01;
     setting.accel_dlpf_cfg   = ACCEL_DLPF_CFG::DLPF_45HZ;
 
-    if (!mpu.setup(0x68, setting)) {
+    // Try 0x68 (AD0=GND/float) then 0x69 (AD0=VCC)
+    const uint8_t addrs[] = {0x68, 0x69};
+    bool found = false;
+    for (uint8_t a : addrs) {
+        Serial.print(F("IMU: trying address 0x"));
+        Serial.println(a, HEX);
+        if (mpu.setup(a, setting)) {
+            Serial.print(F("IMU: found at 0x"));
+            Serial.println(a, HEX);
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
         return ImuInitResult::NOT_FOUND;
     }
 
-    // Calibration: update() must succeed quickly after setup
-    const uint32_t calStart = millis();
-    bool accelGyroDone = false;
-    bool magDone       = false;
+    Serial.println(F("IMU: calibrating accel/gyro (keep still ~1s)..."));
     mpu.calibrateAccelGyro();
-    accelGyroDone = true;
+    Serial.println(F("IMU: calibrating magnetometer (rotate sensor ~15s)..."));
     mpu.calibrateMag();
-    magDone = true;
-    (void)calStart;
-
-    if (!accelGyroDone || !magDone) {
-        return ImuInitResult::CALIB_FAILED;
-    }
 
     return ImuInitResult::OK;
 }

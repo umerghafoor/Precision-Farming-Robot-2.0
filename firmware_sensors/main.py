@@ -21,10 +21,65 @@ import time
 from collections import deque
 
 import serial
+import serial.tools.list_ports
 
 # ── Serial config ──────────────────────────────────────────────────────────────
-SERIAL_PORT = "/dev/ttyUSB0"
-BAUD_RATE   = 115200
+BAUD_RATE      = 115200
+TARGET_NODE_ID = "NODE_ID:sensor_node"
+
+
+def find_port(node_id: str, baudrate: int = BAUD_RATE) -> str | None:
+    """
+    Scan all USB serial ports, send WHOAMI, and return the port whose
+    firmware responds with node_id. Returns None if not found.
+    """
+    candidates = [
+        p.device for p in serial.tools.list_ports.comports()
+        if p.device.startswith(("/dev/ttyUSB", "/dev/ttyACM"))
+    ]
+    if not candidates:
+        return None
+
+    for port in sorted(candidates):
+        try:
+            with serial.Serial(port, baudrate, timeout=3) as s:
+                time.sleep(2)
+                s.reset_input_buffer()
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    line = s.readline().decode("utf-8", errors="ignore").strip()
+                    if line == node_id:
+                        return port
+                    if line.startswith("NODE_ID:"):
+                        break
+                s.write(b"WHOAMI\n")
+                s.flush()
+                deadline = time.monotonic() + 2.0
+                while time.monotonic() < deadline:
+                    line = s.readline().decode("utf-8", errors="ignore").strip()
+                    if line == node_id:
+                        return port
+        except Exception:
+            continue
+    return None
+
+
+def resolve_port() -> str:
+    """Return port from CLI arg, or auto-detect."""
+    if len(sys.argv) > 1:
+        return sys.argv[1]
+    print("Auto-detecting sensor node port...")
+    port = find_port(TARGET_NODE_ID, BAUD_RATE)
+    if port is None:
+        print("ERROR: sensor_node not found on any USB port.")
+        print("  - Check 'ls /dev/ttyUSB* /dev/ttyACM*'")
+        print("  - Pass port explicitly: python main.py /dev/ttyUSBx")
+        sys.exit(1)
+    print(f"Found sensor node on {port}")
+    return port
+
+
+SERIAL_PORT = resolve_port()
 
 # ── IMU scaling (must match firmware) ──────────────────────────────────────────
 # Firmware stores:  ax = accel_g * 1000  → divide by 1000 for g

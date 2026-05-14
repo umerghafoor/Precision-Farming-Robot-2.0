@@ -7,6 +7,7 @@ Format: [Dir1, Speed1, Dir2, Speed2, Dir3, Speed3]
 """
 
 import serial
+import serial.tools.list_ports
 import time
 import sys
 import curses
@@ -17,17 +18,69 @@ DIR_FORWARD = 0
 DIR_BACKWARD = 1
 DIR_STOP = 2
 
+TARGET_NODE_ID = "NODE_ID:motor_controller"
+BAUD_RATE = 115200
+
+
+def find_port(node_id: str, baudrate: int = BAUD_RATE) -> str | None:
+    """
+    Scan all USB serial ports, send WHOAMI, and return the port whose
+    firmware responds with node_id. Returns None if not found.
+    """
+    candidates = [
+        p.device for p in serial.tools.list_ports.comports()
+        if p.device.startswith(("/dev/ttyUSB", "/dev/ttyACM"))
+    ]
+    if not candidates:
+        return None
+
+    for port in sorted(candidates):
+        try:
+            with serial.Serial(port, baudrate, timeout=3) as s:
+                time.sleep(2)          # wait for Arduino reset
+                s.reset_input_buffer()
+                # Drain startup banner — look for NODE_ID line
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    line = s.readline().decode("utf-8", errors="ignore").strip()
+                    if line == node_id:
+                        return port
+                    if line.startswith("NODE_ID:"):
+                        break          # wrong node — stop searching this port
+                # Send WHOAMI in case banner already scrolled past
+                s.write(b"WHOAMI\n")
+                s.flush()
+                deadline = time.monotonic() + 2.0
+                while time.monotonic() < deadline:
+                    line = s.readline().decode("utf-8", errors="ignore").strip()
+                    if line == node_id:
+                        return port
+        except Exception:
+            continue
+    return None
+
+
 class MotorController:
-    def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
+    def __init__(self, port: str | None = None, baudrate: int = BAUD_RATE):
         """Initialize USB Serial connection"""
         print("=" * 50)
         print("6D Signal Motor Controller - USB Serial Master")
         print("=" * 50)
-        self.port = port
         self.baudrate = baudrate
         self.timeout = 1
         self.serial = None
 
+        if port is None:
+            print("Auto-detecting motor controller port...")
+            port = find_port(TARGET_NODE_ID, baudrate)
+            if port is None:
+                print("ERROR: motor_controller node not found on any USB port.")
+                print("  - Check 'ls /dev/ttyUSB* /dev/ttyACM*'")
+                print("  - Pass port explicitly: MotorController(port='/dev/ttyUSBx')")
+                sys.exit(1)
+            print(f"Found motor controller on {port}")
+
+        self.port = port
         if not self._connect_serial(is_initial=True):
             print("\nMake sure:")
             print("  1. Arduino is connected via USB")
@@ -323,8 +376,8 @@ def main(stdscr):
 
     print("Ready! Controls: Arrow keys=drive, E/D=speed +/- , Q/A=servo1 left/right, W/S=servo2 left/right, M=servo1 absolute angle, N=servo2 absolute angle, R=center servos, SPACE/X=stop, ESC=exit")
     
-    # Initialize your motor controller
-    controller = MotorController(port="/dev/ttyUSB0", baudrate=115200)
+    port_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    controller = MotorController(port=port_arg, baudrate=BAUD_RATE)
     keyboard_controller = KeyboardController(controller)
     
     try:
