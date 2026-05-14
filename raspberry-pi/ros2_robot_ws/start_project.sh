@@ -32,6 +32,4 @@ echo "  droidcam-cli pid=$DROIDCAM_PID"
 sleep 2
 
 # --- ROS2 nodes ---
-# droidcam always claims /dev/video0; override the default so webcam_node opens the right device
-export VIDEO_DEVICE=/dev/video0
 exec "$SCRIPT_DIR/start_node.sh" all
