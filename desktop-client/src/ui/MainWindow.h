@@ -50,6 +50,8 @@ private slots:
     void onAddDetectionPanel();
     void onAddTwinVisualization();
     void onAddRobotModel();
+    void onAddLaserCalibration();
+    void onAddIMU3D();
     void onRemoveWidget();
     void onToggleROS2Connection();
     void onAbout();

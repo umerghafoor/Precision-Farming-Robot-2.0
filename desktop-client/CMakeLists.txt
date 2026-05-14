@@ -50,6 +50,7 @@ if(USE_ROS2)
     find_package(ament_cmake QUIET)
     find_package(rclcpp QUIET)
     find_package(std_msgs QUIET)
+    find_package(std_srvs QUIET)
     find_package(sensor_msgs QUIET)
     find_package(geometry_msgs QUIET)
     
@@ -101,6 +102,8 @@ set(SOURCES
     src/ui/widgets/StatusBadge.cpp
     src/ui/widgets/ZoomableImageView.cpp
     src/ui/widgets/RobotModelWidget.cpp
+    src/ui/widgets/LaserCalibrationWidget.cpp
+    src/ui/widgets/IMU3DWidget.cpp
     src/rendering/OBJLoader.cpp
     src/rendering/ModelGLView.cpp
     src/utils/Logger.cpp
@@ -131,6 +134,8 @@ set(HEADERS
     src/ui/widgets/StatusBadge.h
     src/ui/widgets/ZoomableImageView.h
     src/ui/widgets/RobotModelWidget.h
+    src/ui/widgets/LaserCalibrationWidget.h
+    src/ui/widgets/IMU3DWidget.h
     src/rendering/OBJMesh.h
     src/rendering/OBJLoader.h
     src/rendering/ModelGLView.h
@@ -169,6 +174,7 @@ if(USE_ROS2)
     ament_target_dependencies(${PROJECT_NAME}
         rclcpp
         std_msgs
+        std_srvs
         sensor_msgs
         geometry_msgs
     )
