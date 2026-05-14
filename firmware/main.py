@@ -36,25 +36,20 @@ def find_port(node_id: str, baudrate: int = BAUD_RATE) -> str | None:
 
     for port in sorted(candidates):
         try:
-            with serial.Serial(port, baudrate, timeout=3) as s:
-                time.sleep(2)          # wait for Arduino reset
+            with serial.Serial(port, baudrate, timeout=1) as s:
+                # Toggle DTR to force a hardware reset — ensures the boot banner
+                # always prints even if the board is stuck in a halt loop.
+                s.dtr = False
+                time.sleep(0.1)
+                s.dtr = True
                 s.reset_input_buffer()
-                # Drain startup banner — look for NODE_ID line
-                deadline = time.monotonic() + 3.0
+                deadline = time.monotonic() + 3.5
                 while time.monotonic() < deadline:
                     line = s.readline().decode("utf-8", errors="ignore").strip()
                     if line == node_id:
                         return port
                     if line.startswith("NODE_ID:"):
-                        break          # wrong node — stop searching this port
-                # Send WHOAMI in case banner already scrolled past
-                s.write(b"WHOAMI\n")
-                s.flush()
-                deadline = time.monotonic() + 2.0
-                while time.monotonic() < deadline:
-                    line = s.readline().decode("utf-8", errors="ignore").strip()
-                    if line == node_id:
-                        return port
+                        break   # wrong node on this port
         except Exception:
             continue
     return None

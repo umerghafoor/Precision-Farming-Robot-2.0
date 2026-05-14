@@ -28,6 +28,7 @@
 
 #include <Arduino.h>
 #include <SPI.h>
+#include <Wire.h>
 #include "constants.h"
 #include "imu_sensor.h"
 #include "laser_control.h"
@@ -42,55 +43,6 @@ static volatile bool    spiTransferDone = false;
 static ImuData imuData;
 static bool    imuReady = false;
 
-// ── Error blink patterns ──────────────────────────────────────────────────────
-
-// Blink n times at the given on/off period, then hold LED off for gap_ms.
-static void blinkN(uint8_t n, uint16_t on_ms, uint16_t off_ms, uint16_t gap_ms) {
-    for (uint8_t i = 0; i < n; i++) {
-        digitalWrite(LED_PIN, HIGH); delay(on_ms);
-        digitalWrite(LED_PIN, LOW);  delay(off_ms);
-    }
-    delay(gap_ms);
-}
-
-// SOS: · · ·  — — —  · · ·
-static void blinkSOS() {
-    const uint16_t dit = 100, dah = 300, sym = 100, letter = 300, word = 700;
-    // S (· · ·)
-    for (uint8_t i = 0; i < 3; i++) { digitalWrite(LED_PIN, HIGH); delay(dit); digitalWrite(LED_PIN, LOW); delay(sym); }
-    delay(letter);
-    // O (— — —)
-    for (uint8_t i = 0; i < 3; i++) { digitalWrite(LED_PIN, HIGH); delay(dah); digitalWrite(LED_PIN, LOW); delay(sym); }
-    delay(letter);
-    // S (· · ·)
-    for (uint8_t i = 0; i < 3; i++) { digitalWrite(LED_PIN, HIGH); delay(dit); digitalWrite(LED_PIN, LOW); delay(sym); }
-    delay(word);
-}
-
-[[noreturn]] static void haltWithPattern_NotFound() {
-    Serial.println(F("ERROR: MPU-9250 not found! Check wiring (SDA=A4, SCL=A5) and 3.3V power."));
-    Serial.println(F("       Blink pattern: 2 fast pulses, 1 s gap — repeating."));
-    while (true) {
-        blinkN(2, 100, 100, 1000);
-    }
-}
-
-[[noreturn]] static void haltWithPattern_CalibFailed() {
-    Serial.println(F("ERROR: MPU-9250 calibration failed! Keep the sensor still during reset."));
-    Serial.println(F("       Blink pattern: 3 medium pulses, 1 s gap — repeating."));
-    while (true) {
-        blinkN(3, 200, 200, 1000);
-    }
-}
-
-// Called from loop() when runtime reads stall — does NOT return.
-[[noreturn]] static void haltWithPattern_ReadStall() {
-    Serial.println(F("ERROR: IMU read stalled! MPU-9250 stopped responding (possible I2C lockup)."));
-    Serial.println(F("       Blink pattern: SOS — repeating."));
-    while (true) {
-        blinkSOS();
-    }
-}
 
 // ── SPI helpers ───────────────────────────────────────────────────────────────
 
@@ -143,27 +95,48 @@ void setup() {
 
     initLaser();
 
+    // I2C bus scan — runs before IMU init so we can see what's present
+    Wire.begin();
+    Serial.println(F("I2C scan:"));
+    uint8_t i2cFound = 0;
+    for (uint8_t addr = 1; addr < 128; addr++) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+            Serial.print(F("  0x"));
+            if (addr < 16) Serial.print('0');
+            Serial.println(addr, HEX);
+            i2cFound++;
+        }
+    }
+    if (i2cFound == 0) Serial.println(F("  NO DEVICES — check wiring"));
+    Serial.println(F("I2C scan done."));
+
     const ImuInitResult imuResult = initIMU();
     switch (imuResult) {
         case ImuInitResult::NOT_FOUND:
-            haltWithPattern_NotFound();
+            Serial.println(F("WARNING: MPU-9250 not found — continuing without IMU"));
+            break;
         case ImuInitResult::CALIB_FAILED:
-            haltWithPattern_CalibFailed();
+            Serial.println(F("WARNING: MPU-9250 calibration failed — continuing without IMU"));
+            break;
         case ImuInitResult::OK:
+            imuReady = true;
+            Serial.println(F("MPU-9250 ready."));
             break;
     }
 
-    Serial.println(F("MPU-9250 ready."));
-
-    // Configure hardware SPI as slave
+    // Keep SS, SCK, MOSI as inputs with pull-ups so floating lines don't
+    // trigger the SPI ISR. SPI is only enabled once SS is pulled LOW by master.
+    pinMode(SS,   INPUT_PULLUP);
+    pinMode(SCK,  INPUT_PULLUP);
+    pinMode(MOSI, INPUT_PULLUP);
     pinMode(MISO, OUTPUT);
-    SPCR |= _BV(SPE);    // Enable SPI
-    SPCR &= ~_BV(MSTR);  // Slave mode
-    SPCR |= _BV(SPIE);   // Enable SPI interrupt
-    sei();
 
     memset((void *)spiTxBuf, 0, SPI_TX_LEN);
-    SPDR = spiTxBuf[0];
+
+    // Enable SPI slave + interrupt only after pull-ups are set
+    SPCR = _BV(SPE) | _BV(SPIE);   // SPE=enable, SPIE=interrupt, MSTR=0 (slave)
+    sei();
 
     Serial.println(F("SPI slave ready. Waiting for master..."));
 
@@ -182,17 +155,18 @@ void loop() {
     const uint32_t now = millis();
 
     // ── IMU read ──────────────────────────────────────────────────────────────
-    if (now - lastImuMs >= IMU_UPDATE_INTERVAL_MS) {
+    if (imuReady && now - lastImuMs >= IMU_UPDATE_INTERVAL_MS) {
         lastImuMs = now;
         if (readIMU(imuData)) {
             stallCount = 0;
-            imuReady   = true;
             buildTxPacket();
             printIMU(imuData);
         } else {
             stallCount++;
             if (stallCount >= STALL_LIMIT) {
-                haltWithPattern_ReadStall();
+                imuReady  = false;
+                stallCount = 0;
+                Serial.println(F("WARNING: IMU read stalled — disabled"));
             }
         }
     }

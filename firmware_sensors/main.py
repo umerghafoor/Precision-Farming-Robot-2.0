@@ -30,8 +30,9 @@ TARGET_NODE_ID = "NODE_ID:sensor_node"
 
 def find_port(node_id: str, baudrate: int = BAUD_RATE) -> str | None:
     """
-    Scan all USB serial ports, send WHOAMI, and return the port whose
-    firmware responds with node_id. Returns None if not found.
+    Scan all USB serial ports and return the one whose firmware identifies
+    as node_id. Reads the boot banner (Arduino resets on open) then sends
+    WHOAMI as a fallback for boards that were already running.
     """
     candidates = [
         p.device for p in serial.tools.list_ports.comports()
@@ -42,23 +43,21 @@ def find_port(node_id: str, baudrate: int = BAUD_RATE) -> str | None:
 
     for port in sorted(candidates):
         try:
-            with serial.Serial(port, baudrate, timeout=3) as s:
-                time.sleep(2)
-                s.reset_input_buffer()
-                deadline = time.monotonic() + 3.0
+            with serial.Serial(port, baudrate, timeout=1) as s:
+                # Toggle DTR to force a hardware reset — ensures the boot banner
+                # always prints even if the board is stuck in a halt loop.
+                s.dtr = False
+                time.sleep(0.1)
+                s.dtr = True
+                # Do NOT flush — the NODE_ID banner arrives during this wait
+                time.sleep(0.1)
+                deadline = time.monotonic() + 3.5
                 while time.monotonic() < deadline:
                     line = s.readline().decode("utf-8", errors="ignore").strip()
                     if line == node_id:
                         return port
                     if line.startswith("NODE_ID:"):
-                        break
-                s.write(b"WHOAMI\n")
-                s.flush()
-                deadline = time.monotonic() + 2.0
-                while time.monotonic() < deadline:
-                    line = s.readline().decode("utf-8", errors="ignore").strip()
-                    if line == node_id:
-                        return port
+                        break   # wrong node on this port
         except Exception:
             continue
     return None

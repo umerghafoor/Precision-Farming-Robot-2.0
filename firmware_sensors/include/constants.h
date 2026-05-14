@@ -2,13 +2,13 @@
 #define CONSTANTS_H
 
 // --- Pins ---
-#define LASER_PIN        7    // Digital output — laser module
+#define LASER_PIN        A0   // Digital output — laser module
 #define LED_PIN          13   // Onboard LED (status)
 
 // Set to 1 if your laser module is active-LOW (turns ON when pin is LOW).
 // KY-008 and similar bare-diode boards are active-HIGH (set to 0).
 // If the laser is always on at startup, flip this to 1.
-#define LASER_ACTIVE_LOW 0
+#define LASER_ACTIVE_LOW 1
 
 // --- SPI slave ---
 // Hardware SPI pins (fixed by ATmega328P):
