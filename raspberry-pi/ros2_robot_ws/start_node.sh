@@ -166,28 +166,23 @@ action_all_nodes() {
     exit 1
   fi
 
-  # spi_controller_bridge requires /dev/spidev0.0 (enable SPI via raspi-config if needed)
-  if [[ -e /dev/spidev0.0 ]]; then
-    start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge --ros-args \
-      -p cmd_vel_topic:=/cmd_vel \
-      -p servo1_topic:=/servo1/angle \
-      -p servo2_topic:=/servo2/angle \
-      -p spi_device:=/dev/spidev0.0 \
-      -p spi_mode:=0 \
-      -p spi_bits_per_word:=8 \
-      -p spi_speed_hz:=500000 \
-      -p wheel_base:=0.2 \
-      -p max_linear_velocity:=1.0 \
-      -p cmd_timeout_sec:=0.5 \
-      -p tx_rate_hz:=20.0 \
-      -p default_servo_angle:=90
-  else
-    echo "  SKIP spi_controller_bridge: /dev/spidev0.0 not found (SPI disabled)"
-  fi
-  # start_node imu_node ros2 run imu_sensor imu_node --ros-args \
-  #   -p update_rate:=50.0 \
-  #   -p i2c_bus:=1 \
-  #   -p i2c_address:=0x68
+  # Motor controller — auto-detects NODE_ID:motor_controller on /dev/ttyUSB*
+  start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge --ros-args \
+    -p serial_port:=auto \
+    -p cmd_vel_topic:=/cmd_vel \
+    -p servo1_topic:=/servo1/angle \
+    -p servo2_topic:=/servo2/angle \
+    -p wheel_base:=0.2 \
+    -p max_linear_velocity:=1.0 \
+    -p cmd_timeout_sec:=0.5 \
+    -p tx_rate_hz:=20.0 \
+    -p default_servo_angle:=90
+
+  # IMU + laser — auto-detects NODE_ID:sensor_node on /dev/ttyUSB*
+  start_node imu_node ros2 run imu_sensor imu_node --ros-args \
+    -p serial_port:=auto \
+    -p publish_rate_hz:=50.0
+
   start_node webcam_node ros2 run camera_sensor webcam_node --ros-args \
     -p device_index:="$device_index" \
     -p image_width:=640 \
@@ -197,6 +192,7 @@ action_all_nodes() {
     -p camera_topic:=/camera/raw \
     -p color_jpeg_topic:=/camera/color_jpeg \
     -p jpeg_quality:=80
+
   start_node yolo_detection_node ros2 run yolo_detection yolo_detection_node --ros-args \
     -p confidence_threshold:=0.25 \
     -p iou_threshold:=0.45 \
@@ -205,17 +201,20 @@ action_all_nodes() {
     -p annotated_topic:=/camera/detection \
     -p results_topic:=/detections/results \
     -p enable_visualization:=true
+
   start_node encoder_node ros2 run encoder_odometry encoder_node --ros-args \
     -p wheel_radius:=0.05 \
     -p wheel_base:=0.2 \
     -p counts_per_rev:=20 \
     -p update_rate:=20.0
-  # start_node robot_controller ros2 run robot_controller robot_controller --ros-args \
-  #   -p control_loop_rate:=20.0 \
-  #   -p emergency_stop_enabled:=true \
-  #   -p max_linear_velocity:=1.0 \
-  #   -p max_angular_velocity:=2.0 \
-  #   -p min_battery_voltage:=7.0
+
+  start_node robot_controller ros2 run robot_controller robot_controller --ros-args \
+    -p control_loop_rate:=20.0 \
+    -p emergency_stop_enabled:=true \
+    -p max_linear_velocity:=1.0 \
+    -p max_angular_velocity:=2.0 \
+    -p min_battery_voltage:=7.0
+
   start_node mqtt_bridge ros2 run mqtt_bridge mqtt_bridge_node --ros-args \
     -p mqtt_host:="$MQTT_HOST" \
     -p mqtt_port:="$MQTT_PORT" \
@@ -229,7 +228,14 @@ action_all_nodes() {
 
   echo ""
   echo "All nodes started. Press Ctrl+C to stop all."
-  echo "Camera topics: /camera/raw (gray compressed) | /camera/color_jpeg (JPEG)"
+  echo ""
+  echo "  spi_controller_bridge  — motor control  (/cmd_vel, /servo1/angle, /servo2/angle)"
+  echo "  imu_node               — IMU + laser     (/imu/data, /laser/set, /laser/cmd)"
+  echo "  webcam_node            — camera          (/camera/raw, /camera/color_jpeg)"
+  echo "  yolo_detection_node    — detection       (/camera/detection, /detections/results)"
+  echo "  encoder_node           — odometry        (/odom)"
+  echo "  robot_controller       — high-level ctrl (/cmd_vel)"
+  echo "  mqtt_bridge            — MQTT relay       ($MQTT_HOST:$MQTT_PORT)"
   echo ""
   wait
 }
