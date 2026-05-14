@@ -4,6 +4,7 @@
   - /camera/color_jpeg : JPEG compressed       (CompressedImage, standard format)
 """
 
+import glob
 import time
 import numpy as np
 import cv2
@@ -27,7 +28,7 @@ class WebcamNode(Node):
         self.declare_parameter('jpeg_quality',     50)
         self.declare_parameter('artificial_delay', 0.0)
 
-        self.device_index     = int(self.get_parameter('device_index').value)
+        self.device_index     = self._resolve_device(int(self.get_parameter('device_index').value))
         self.image_width      = int(self.get_parameter('image_width').value)
         self.image_height     = int(self.get_parameter('image_height').value)
         self.publish_rate     = max(1.0, float(self.get_parameter('publish_rate').value))
@@ -52,6 +53,27 @@ class WebcamNode(Node):
             f'raw→{self.camera_topic} ({self.bit_depth}-bit gray) | '
             f'jpeg→{self.color_jpeg_topic} (q={self.jpeg_quality})'
         )
+
+    # ------------------------------------------------------------------
+    def _resolve_device(self, hint: int) -> int:
+        """Return the first working /dev/video* index; fall back to hint."""
+        candidates = sorted(glob.glob('/dev/video*'))
+        self.get_logger().info(f'Video devices found: {candidates or "none"}')
+        for path in candidates:
+            try:
+                idx = int(path.replace('/dev/video', ''))
+            except ValueError:
+                continue
+            cap = cv2.VideoCapture(idx)
+            if cap.isOpened():
+                cap.release()
+                self.get_logger().info(f'Auto-selected {path} (index {idx})')
+                return idx
+            cap.release()
+        self.get_logger().warn(
+            f'No working /dev/video* found — falling back to device_index={hint}'
+        )
+        return hint
 
     # ------------------------------------------------------------------
     def _open_camera(self):
