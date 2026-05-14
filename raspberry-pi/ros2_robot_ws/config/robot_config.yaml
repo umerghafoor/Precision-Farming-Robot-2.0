@@ -85,7 +85,7 @@ robot_controller:
 # YOLO Detection Parameters
 yolo_detection:
   # Model configuration
-  model_path: "/home/umer/Precision-Farming-Robot-2.0/yolo26n.pt"               # Path to YOLO model file (.pt, .onnx, or custom format)
+  model_path: "/home/umer/Precision-Farming-Robot-2.0/yolo8n.pt"               # Path to YOLO model file (.pt, .onnx, or custom format)
                                # Leave empty to disable detection (only republish camera stream)
 
   # Inference parameters
