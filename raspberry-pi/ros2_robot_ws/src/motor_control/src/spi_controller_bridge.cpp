@@ -192,11 +192,17 @@ void SPIControllerBridge::transmitTimerCallback() {
     latest_cmd_vel_.angular.z = 0.0;
   }
 
+  if (spi_fd_ < 0) {
+    // No SPI hardware — already warned at startup, stay silent.
+    return;
+  }
+
   const auto packet = buildPacket();
   if (!transmitPacket(packet)) {
     RCLCPP_ERROR_THROTTLE(
       this->get_logger(), *this->get_clock(), 2000,
-      "SPI transfer failed. Check wiring, permissions, and SPI device path.");
+      "SPI transfer failed on %s. Check wiring and permissions.",
+      spi_device_.c_str());
   }
 }
 
