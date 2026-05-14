@@ -4,7 +4,7 @@
 
 static MPU9250 mpu;
 
-bool initIMU() {
+ImuInitResult initIMU() {
     Wire.begin();
     MPU9250Setting setting;
     setting.accel_fs_sel     = ACCEL_FS_SEL::A4G;
@@ -17,11 +17,24 @@ bool initIMU() {
     setting.accel_dlpf_cfg   = ACCEL_DLPF_CFG::DLPF_45HZ;
 
     if (!mpu.setup(0x68, setting)) {
-        return false;
+        return ImuInitResult::NOT_FOUND;
     }
+
+    // Calibration: update() must succeed quickly after setup
+    const uint32_t calStart = millis();
+    bool accelGyroDone = false;
+    bool magDone       = false;
     mpu.calibrateAccelGyro();
+    accelGyroDone = true;
     mpu.calibrateMag();
-    return true;
+    magDone = true;
+    (void)calStart;
+
+    if (!accelGyroDone || !magDone) {
+        return ImuInitResult::CALIB_FAILED;
+    }
+
+    return ImuInitResult::OK;
 }
 
 bool readIMU(ImuData &out) {
