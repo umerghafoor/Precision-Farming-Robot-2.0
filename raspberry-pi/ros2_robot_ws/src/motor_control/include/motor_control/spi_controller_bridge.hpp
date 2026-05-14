@@ -31,20 +31,25 @@ private:
   void transmitTimerCallback();
 
   // ── Packet helpers ─────────────────────────────────────────────────────────
-  std::array<uint8_t, 8> buildPacket() const;
+  // Firmware SIGNAL_SIZE = 6: [Dir1,Spd1,Dir2,Spd2,Dir3,Spd3]
+  std::array<uint8_t, 6> buildPacket() const;
   MotorCommand toMotorCommand(double normalized_speed) const;
   uint8_t clampServoAngle(int angle) const;
-  bool transmitPacket(const std::array<uint8_t, 8> & packet);
+  bool transmitPacket(const std::array<uint8_t, 6> & packet);
+
+  // Servo angles sent as text "S1:<deg>\n" only when the value changes
+  void sendServoCommand(int servo_id, uint8_t angle);
+  uint8_t prev_servo1_angle_{255};  // 255 = never sent
+  uint8_t prev_servo2_angle_{255};
 
   // ── USB Serial transport ───────────────────────────────────────────────────
-  // Auto-detects by draining IMU flood then sending WHOAMI (mirrors imu_node).
   std::string detectSerialPort(const std::string & hint);
   bool openSerial(const std::string & port);
   void closeSerial();
 
   std::string serial_port_;
   int         serial_fd_{-1};
-  std::mutex  write_mutex_;  // protects serial_fd_ writes
+  std::mutex  write_mutex_;
 
   // ── ROS interfaces ─────────────────────────────────────────────────────────
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
@@ -53,15 +58,15 @@ private:
   rclcpp::TimerBase::SharedPtr                               tx_timer_;
 
   // ── Robot parameters ───────────────────────────────────────────────────────
-  double   wheel_base_;
-  double   max_linear_velocity_;
-  double   cmd_timeout_sec_;
+  double wheel_base_;
+  double max_linear_velocity_;
+  double cmd_timeout_sec_;
 
   // ── Command state ──────────────────────────────────────────────────────────
   geometry_msgs::msg::Twist latest_cmd_vel_;
   rclcpp::Time              latest_cmd_time_;
-  uint8_t servo1_angle_;
-  uint8_t servo2_angle_;
+  uint8_t servo1_angle_{90};
+  uint8_t servo2_angle_{90};
 };
 
 #endif  // MOTOR_CONTROL_SPI_CONTROLLER_BRIDGE_HPP

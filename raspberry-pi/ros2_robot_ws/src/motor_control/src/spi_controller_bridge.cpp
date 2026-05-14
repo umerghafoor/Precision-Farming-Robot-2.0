@@ -69,7 +69,7 @@ SPIControllerBridge::SPIControllerBridge()
   servo1_angle_(90),
   servo2_angle_(90)
 {
-  this->declare_parameter<std::string>("cmd_vel_topic",   "/cmd_vel");
+  this->declare_parameter<std::string>("cmd_vel_topic",   "/cmd_vel");   // listen directly — no safety wrapper needed
   this->declare_parameter<std::string>("servo1_topic",    "/servo1/angle");
   this->declare_parameter<std::string>("servo2_topic",    "/servo2/angle");
   this->declare_parameter<std::string>("serial_port",     "auto");
@@ -222,13 +222,23 @@ void SPIControllerBridge::cmdVelCallback(
 void SPIControllerBridge::servo1Callback(
   const std_msgs::msg::Int16::SharedPtr msg)
 {
-  servo1_angle_ = clampServoAngle(static_cast<int>(msg->data));
+  const uint8_t angle = clampServoAngle(static_cast<int>(msg->data));
+  servo1_angle_ = angle;
+  if (angle != prev_servo1_angle_) {
+    sendServoCommand(1, angle);
+    prev_servo1_angle_ = angle;
+  }
 }
 
 void SPIControllerBridge::servo2Callback(
   const std_msgs::msg::Int16::SharedPtr msg)
 {
-  servo2_angle_ = clampServoAngle(static_cast<int>(msg->data));
+  const uint8_t angle = clampServoAngle(static_cast<int>(msg->data));
+  servo2_angle_ = angle;
+  if (angle != prev_servo2_angle_) {
+    sendServoCommand(2, angle);
+    prev_servo2_angle_ = angle;
+  }
 }
 
 void SPIControllerBridge::transmitTimerCallback() {
@@ -251,8 +261,9 @@ void SPIControllerBridge::transmitTimerCallback() {
 
 // ── Packet building ───────────────────────────────────────────────────────────
 
-std::array<uint8_t, 8> SPIControllerBridge::buildPacket() const {
-  // Format: [Dir1, Speed1, Dir2, Speed2, Dir3, Speed3, Servo1, Servo2]
+std::array<uint8_t, 6> SPIControllerBridge::buildPacket() const {
+  // Firmware SIGNAL_SIZE = 6: [Dir1,Spd1,Dir2,Spd2,Dir3,Spd3]
+  // Servo angles are sent separately as text "S1:<deg>\n" — NOT in this packet.
   const double linear  = latest_cmd_vel_.linear.x;
   const double angular = latest_cmd_vel_.angular.z;
 
@@ -264,12 +275,11 @@ std::array<uint8_t, 8> SPIControllerBridge::buildPacket() const {
 
   const MotorCommand m1 = toMotorCommand(left_n);
   const MotorCommand m2 = toMotorCommand(right_n);
-  const MotorCommand m3 = toMotorCommand(left_n);
+  const MotorCommand m3 = toMotorCommand(left_n);  // motor3 mirrors left side
 
   return {m1.direction, m1.speed,
           m2.direction, m2.speed,
-          m3.direction, m3.speed,
-          servo1_angle_, servo2_angle_};
+          m3.direction, m3.speed};
 }
 
 SPIControllerBridge::MotorCommand
@@ -286,11 +296,20 @@ uint8_t SPIControllerBridge::clampServoAngle(int angle) const {
   return static_cast<uint8_t>(std::clamp(angle, 0, 180));
 }
 
-bool SPIControllerBridge::transmitPacket(const std::array<uint8_t, 8> & packet) {
+bool SPIControllerBridge::transmitPacket(const std::array<uint8_t, 6> & packet) {
   std::lock_guard<std::mutex> lk(write_mutex_);
   if (serial_fd_ < 0) return false;
   return write(serial_fd_, packet.data(), packet.size()) ==
          static_cast<ssize_t>(packet.size());
+}
+
+void SPIControllerBridge::sendServoCommand(int servo_id, uint8_t angle) {
+  char cmd[16];
+  snprintf(cmd, sizeof(cmd), "S%d:%d\n", servo_id, static_cast<int>(angle));
+  std::lock_guard<std::mutex> lk(write_mutex_);
+  if (serial_fd_ < 0) return;
+  write(serial_fd_, cmd, strlen(cmd));
+  RCLCPP_DEBUG(get_logger(), "Servo%d -> %d°", servo_id, static_cast<int>(angle));
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────

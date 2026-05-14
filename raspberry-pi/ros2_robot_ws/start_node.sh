@@ -169,7 +169,7 @@ action_all_nodes() {
   # Motor controller — auto-detects NODE_ID:motor_controller on /dev/ttyUSB*
   start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge --ros-args \
     -p serial_port:=auto \
-    -p cmd_vel_topic:=/cmd_vel_safe \
+    -p cmd_vel_topic:=/cmd_vel \
     -p servo1_topic:=/servo1/angle \
     -p servo2_topic:=/servo2/angle \
     -p wheel_base:=0.2 \

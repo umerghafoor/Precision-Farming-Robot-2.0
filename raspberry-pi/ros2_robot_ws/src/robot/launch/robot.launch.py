@@ -19,7 +19,7 @@ def generate_launch_description():
             name='spi_controller_bridge',
             output='screen',
             parameters=[
-                {'cmd_vel_topic': '/cmd_vel_safe'},
+                {'cmd_vel_topic': '/cmd_vel'},
                 {'servo1_topic': '/servo1/angle'},
                 {'servo2_topic': '/servo2/angle'},
                 {'serial_port': 'auto'},
