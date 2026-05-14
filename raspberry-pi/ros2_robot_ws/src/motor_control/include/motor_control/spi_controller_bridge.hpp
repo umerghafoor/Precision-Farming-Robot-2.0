@@ -28,6 +28,8 @@ private:
   void servo2Callback(const std_msgs::msg::Int16::SharedPtr msg);
   void transmitTimerCallback();
 
+  // Returns the first accessible spidev path, or empty string if none found.
+  std::string detectSpiDevice(const std::string & hint);
   void openAndConfigureSPI();
   bool transmitPacket(const std::array<uint8_t, 8> & packet);
   std::array<uint8_t, 8> buildPacket() const;

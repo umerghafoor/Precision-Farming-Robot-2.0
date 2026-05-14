@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
+#include <vector>
 
 SPIControllerBridge::SPIControllerBridge()
 : Node("spi_controller_bridge"),
@@ -43,7 +44,7 @@ SPIControllerBridge::SPIControllerBridge()
   const auto servo1_topic = this->get_parameter("servo1_topic").as_string();
   const auto servo2_topic = this->get_parameter("servo2_topic").as_string();
 
-  spi_device_ = this->get_parameter("spi_device").as_string();
+  const auto spi_hint = this->get_parameter("spi_device").as_string();
   spi_mode_ = static_cast<uint8_t>(this->get_parameter("spi_mode").as_int());
   spi_bits_per_word_ = static_cast<uint8_t>(this->get_parameter("spi_bits_per_word").as_int());
   spi_speed_hz_ = static_cast<uint32_t>(this->get_parameter("spi_speed_hz").as_int());
@@ -55,6 +56,7 @@ SPIControllerBridge::SPIControllerBridge()
   servo1_angle_ = clampServoAngle(default_servo);
   servo2_angle_ = clampServoAngle(default_servo);
 
+  spi_device_ = detectSpiDevice(spi_hint);
   openAndConfigureSPI();
 
   cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
@@ -86,33 +88,87 @@ SPIControllerBridge::~SPIControllerBridge() {
   }
 }
 
-void SPIControllerBridge::openAndConfigureSPI() {
-  spi_fd_ = open(spi_device_.c_str(), O_RDWR);
-  if (spi_fd_ < 0) {
-    throw std::runtime_error(
-            "Failed to open SPI device " + spi_device_ + ": " + std::strerror(errno));
+std::string SPIControllerBridge::detectSpiDevice(const std::string & hint) {
+  // If an explicit device was given and it exists, use it directly.
+  if (hint != "auto" && access(hint.c_str(), F_OK) == 0) {
+    RCLCPP_INFO(get_logger(), "Using configured SPI device: %s", hint.c_str());
+    return hint;
   }
 
-  auto throw_with_cleanup = [this](const std::string & msg) {
+  if (hint != "auto") {
+    RCLCPP_WARN(get_logger(),
+      "Configured SPI device '%s' not found — scanning for available devices.",
+      hint.c_str());
+  } else {
+    RCLCPP_INFO(get_logger(), "Auto-detecting SPI device...");
+  }
+
+  // Scan spidev0.x then spidev1.x (bus 0 chip selects first, common on Pi)
+  std::vector<std::string> candidates;
+  for (int bus = 0; bus <= 3; ++bus) {
+    for (int cs = 0; cs <= 3; ++cs) {
+      std::string p = "/dev/spidev" + std::to_string(bus) + "." + std::to_string(cs);
+      if (access(p.c_str(), F_OK) == 0) {
+        candidates.push_back(p);
+      }
+    }
+  }
+
+  if (candidates.empty()) {
+    RCLCPP_WARN(get_logger(),
+      "No SPI devices found under /dev/spidev*. "
+      "Enable SPI in raspi-config or pass spi_device:=<path>. "
+      "Node will start but motor commands will be dropped.");
+    return {};
+  }
+
+  const std::string chosen = candidates.front();
+  RCLCPP_INFO(get_logger(), "Found SPI device: %s (available: %zu)",
+    chosen.c_str(), candidates.size());
+  for (size_t i = 1; i < candidates.size(); ++i) {
+    RCLCPP_DEBUG(get_logger(), "  also available: %s", candidates[i].c_str());
+  }
+  return chosen;
+}
+
+void SPIControllerBridge::openAndConfigureSPI() {
+  if (spi_device_.empty()) {
+    // Already warned in detectSpiDevice — stay in degraded mode (spi_fd_ = -1)
+    return;
+  }
+
+  spi_fd_ = open(spi_device_.c_str(), O_RDWR);
+  if (spi_fd_ < 0) {
+    RCLCPP_ERROR(get_logger(),
+      "Failed to open SPI device %s: %s. "
+      "Motor commands will be dropped until device becomes available.",
+      spi_device_.c_str(), std::strerror(errno));
+    return;
+  }
+
+  auto warn_and_close = [this](const std::string & msg) {
+    RCLCPP_ERROR(get_logger(), "%s: %s", msg.c_str(), std::strerror(errno));
     close(spi_fd_);
     spi_fd_ = -1;
-    throw std::runtime_error(msg + ": " + std::string(std::strerror(errno)));
   };
 
   if (ioctl(spi_fd_, SPI_IOC_WR_MODE, &spi_mode_) < 0 ||
       ioctl(spi_fd_, SPI_IOC_RD_MODE, &spi_mode_) < 0) {
-    throw_with_cleanup("Failed to set SPI mode");
+    warn_and_close("Failed to set SPI mode"); return;
   }
 
   if (ioctl(spi_fd_, SPI_IOC_WR_BITS_PER_WORD, &spi_bits_per_word_) < 0 ||
       ioctl(spi_fd_, SPI_IOC_RD_BITS_PER_WORD, &spi_bits_per_word_) < 0) {
-    throw_with_cleanup("Failed to set SPI bits per word");
+    warn_and_close("Failed to set SPI bits per word"); return;
   }
 
   if (ioctl(spi_fd_, SPI_IOC_WR_MAX_SPEED_HZ, &spi_speed_hz_) < 0 ||
       ioctl(spi_fd_, SPI_IOC_RD_MAX_SPEED_HZ, &spi_speed_hz_) < 0) {
-    throw_with_cleanup("Failed to set SPI max speed");
+    warn_and_close("Failed to set SPI max speed"); return;
   }
+
+  RCLCPP_INFO(get_logger(), "SPI device %s opened (mode=%u, %u bits, %u Hz)",
+    spi_device_.c_str(), spi_mode_, spi_bits_per_word_, spi_speed_hz_);
 }
 
 void SPIControllerBridge::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {

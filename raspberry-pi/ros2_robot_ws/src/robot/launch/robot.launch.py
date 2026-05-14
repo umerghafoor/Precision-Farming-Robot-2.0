@@ -22,7 +22,7 @@ def generate_launch_description():
                 {'cmd_vel_topic': '/cmd_vel'},
                 {'servo1_topic': '/servo1/angle'},
                 {'servo2_topic': '/servo2/angle'},
-                {'spi_device': '/dev/spidev0.0'},
+                {'spi_device': 'auto'},
                 {'spi_mode': 0},
                 {'spi_bits_per_word': 8},
                 {'spi_speed_hz': 500000},
