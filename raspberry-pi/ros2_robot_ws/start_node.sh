@@ -166,19 +166,24 @@ action_all_nodes() {
     exit 1
   fi
 
-  start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge --ros-args \
-    -p cmd_vel_topic:=/cmd_vel \
-    -p servo1_topic:=/servo1/angle \
-    -p servo2_topic:=/servo2/angle \
-    -p spi_device:=/dev/spidev0.0 \
-    -p spi_mode:=0 \
-    -p spi_bits_per_word:=8 \
-    -p spi_speed_hz:=500000 \
-    -p wheel_base:=0.2 \
-    -p max_linear_velocity:=1.0 \
-    -p cmd_timeout_sec:=0.5 \
-    -p tx_rate_hz:=20.0 \
-    -p default_servo_angle:=90
+  # spi_controller_bridge requires /dev/spidev0.0 (enable SPI via raspi-config if needed)
+  if [[ -e /dev/spidev0.0 ]]; then
+    start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge --ros-args \
+      -p cmd_vel_topic:=/cmd_vel \
+      -p servo1_topic:=/servo1/angle \
+      -p servo2_topic:=/servo2/angle \
+      -p spi_device:=/dev/spidev0.0 \
+      -p spi_mode:=0 \
+      -p spi_bits_per_word:=8 \
+      -p spi_speed_hz:=500000 \
+      -p wheel_base:=0.2 \
+      -p max_linear_velocity:=1.0 \
+      -p cmd_timeout_sec:=0.5 \
+      -p tx_rate_hz:=20.0 \
+      -p default_servo_angle:=90
+  else
+    echo "  SKIP spi_controller_bridge: /dev/spidev0.0 not found (SPI disabled)"
+  fi
   start_node imu_node ros2 run imu_sensor imu_node --ros-args \
     -p update_rate:=50.0 \
     -p i2c_bus:=1 \
@@ -196,7 +201,7 @@ action_all_nodes() {
     -p confidence_threshold:=0.25 \
     -p iou_threshold:=0.45 \
     -p input_size:=640 \
-    -p camera_topic:=/camera/raw \
+    -p camera_topic:=/camera/color_jpeg \
     -p annotated_topic:=/camera/detection \
     -p results_topic:=/detections/results \
     -p enable_visualization:=true
