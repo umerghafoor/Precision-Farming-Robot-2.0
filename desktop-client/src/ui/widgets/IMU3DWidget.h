@@ -5,7 +5,7 @@
 #include <QLabel>
 #include <QTimer>
 #include <QPainter>
-#include <QDeque>
+#include <deque>
 #include <array>
 #include <mutex>
 
@@ -47,7 +47,7 @@ private:
     static constexpr int HISTORY = 200;
     QString      m_label;
     QColor       m_color;
-    QDeque<double> m_data;
+    std::deque<double> m_data;
     double       m_min{-1}, m_max{1};
 };
 
