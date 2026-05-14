@@ -2,11 +2,12 @@
 #define MOTOR_CONTROL_H
 
 #include <Arduino.h>
+#include <AFMotor.h>
 #include "constants.h"
 
 /**
  * Motor Control Module
- * Handles all L298N motor driver operations for 4-wheel drive system
+ * Handles all Adafruit Motor Shield operations for 4-wheel drive system
  */
 
 // Motor control structure

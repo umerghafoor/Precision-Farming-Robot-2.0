@@ -25,3 +25,4 @@ WE3DS*
 output_gt
 yolo_we3ds*
 runs
+*.pyc

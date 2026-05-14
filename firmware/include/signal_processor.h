@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "constants.h"
 #include "motor_control.h"
+#include "servo_control.h"
 
 /**
  * Signal Processor Module
@@ -25,6 +26,6 @@ void process6DSignal();
 void checkSerialData();
 
 // Handle text commands from serial
-void handleTextCommand(String cmd);
+void handleTextCommand(const char *cmd);
 
 #endif

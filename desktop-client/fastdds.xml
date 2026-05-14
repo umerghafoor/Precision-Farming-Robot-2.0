@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+
+    <transport_descriptors>
+        <transport_descriptor>
+            <transport_id>TailscaleTransport</transport_id>
+            <type>UDPv4</type>
+        </transport_descriptor>
+    </transport_descriptors>
+
+    <participant profile_name="default" is_default_profile="true">
+        <rtps>
+            <userTransports>
+                <transport_id>TailscaleTransport</transport_id>
+            </userTransports>
+
+            <useBuiltinTransports>true</useBuiltinTransports>
+
+            <builtin>
+                <initialPeersList>
+
+                    <!-- Device 1 -->
+                    <locator>
+                        <udpv4>
+                            <address>100.99.166.15</address>
+                        </udpv4>
+                    </locator>
+
+                    <!-- Device 2 -->
+                    <locator>
+                        <udpv4>
+                            <address>100.106.88.44</address>
+                        </udpv4>
+                    </locator>
+
+                    <!-- Device 3 -->
+                    <locator>
+                        <udpv4>
+                            <address>100.127.210.38</address>
+                        </udpv4>
+                    </locator>
+
+                </initialPeersList>
+            </builtin>
+        </rtps>
+    </participant>
+
+</profiles>

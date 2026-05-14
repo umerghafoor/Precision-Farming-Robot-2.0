@@ -76,10 +76,13 @@ void SidebarWidget::setupUI()
     QGroupBox* motionGroup = new QGroupBox("Motion");
     QVBoxLayout* motionLayout = new QVBoxLayout();
 
-    // directional pad grid
+    // directional pad grid — fixed 52×52 square buttons, centered
     QGridLayout* grid = new QGridLayout();
+    grid->setSpacing(4);
+    grid->setContentsMargins(0, 0, 0, 0);
     auto makeButton = [&](Motion m, const QString& text){
         QPushButton* b = new QPushButton(text);
+        b->setFixedSize(52, 52);
         b->setAutoRepeat(true);
         b->setAutoRepeatDelay(300);
         b->setAutoRepeatInterval(100);
@@ -94,14 +97,19 @@ void SidebarWidget::setupUI()
     grid->addWidget(makeButton(Motion::FwdRight, "↗"), 0, 2);
 
     grid->addWidget(makeButton(Motion::SpinLeft, "⟲"), 1, 0);
-    grid->addItem(new QSpacerItem(40, 40), 1, 1);
+    grid->addItem(new QSpacerItem(52, 52, QSizePolicy::Fixed, QSizePolicy::Fixed), 1, 1);
     grid->addWidget(makeButton(Motion::SpinRight, "⟳"), 1, 2);
 
     grid->addWidget(makeButton(Motion::BackLeft, "↙"), 2, 0);
     grid->addWidget(makeButton(Motion::Backward, "↓"), 2, 1);
     grid->addWidget(makeButton(Motion::BackRight, "↘"), 2, 2);
 
-    motionLayout->addLayout(grid);
+    // wrap in a centering container
+    QHBoxLayout* gridCenter = new QHBoxLayout();
+    gridCenter->addStretch(1);
+    gridCenter->addLayout(grid);
+    gridCenter->addStretch(1);
+    motionLayout->addLayout(gridCenter);
 
     // speed slider
     QHBoxLayout* speedLayout = new QHBoxLayout();
@@ -133,7 +141,9 @@ void SidebarWidget::setupUI()
     // spin buttons
     QHBoxLayout* spinLayout = new QHBoxLayout();
     m_spinLeftButton = new QPushButton("Spin Left");
+    m_spinLeftButton->setObjectName("spinLeftButton");
     m_spinRightButton = new QPushButton("Spin Right");
+    m_spinRightButton->setObjectName("spinRightButton");
     connect(m_spinLeftButton, &QPushButton::pressed, this, [this](){
         if (m_ros2Interface) m_ros2Interface->publishVelocityCommand(0.0, 0.0, m_maxAngular * m_speed);
     });

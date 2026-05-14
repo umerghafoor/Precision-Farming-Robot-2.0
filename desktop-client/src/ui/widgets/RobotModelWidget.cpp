@@ -16,7 +16,7 @@
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-// box.obj has no separate wheel sub-objects; leave empty so no mesh tinting
+// robot.obj has no separate wheel sub-objects; leave empty so no mesh tinting
 // is applied and wheel rotation skips gracefully.
 static const QStringList WHEEL_OBJECT_NAMES = {};
 static const QStringList WHEEL_LABELS = { "FL", "FR", "RL" };
@@ -52,7 +52,7 @@ static QString colorToCSS(const QVector3D &c)
 
 static QString findModelFile()
 {
-    const QString name = QStringLiteral("box.obj");
+    const QString name = QStringLiteral("robot.obj");
     const QStringList candidates = {
         QCoreApplication::applicationDirPath() + "/" + name,
         QCoreApplication::applicationDirPath() + "/../" + name,
@@ -114,7 +114,7 @@ void RobotModelWidget::setupUI()
 
         m_loadLabel = new QLabel("Loading model…");
         m_loadLabel->setAlignment(Qt::AlignCenter);
-        m_loadLabel->setStyleSheet("QLabel { font-size: 13px; color: #aaa; }");
+        m_loadLabel->setStyleSheet("QLabel { font-size: 13px; color: #6B7280; }");
 
         m_progressBar = new QProgressBar;
         m_progressBar->setRange(0, 100);
@@ -122,7 +122,7 @@ void RobotModelWidget::setupUI()
         m_progressBar->setFixedHeight(10);
         m_progressBar->setTextVisible(false);
         m_progressBar->setStyleSheet(
-            "QProgressBar { border: none; border-radius: 4px; background: #2a2a2a; }"
+            "QProgressBar { border: none; border-radius: 4px; background: #E5E7EB; }"
             "QProgressBar::chunk { background: #4CAF50; border-radius: 4px; }");
 
         l->addWidget(m_loadLabel);
@@ -137,21 +137,59 @@ void RobotModelWidget::setupUI()
         l->setContentsMargins(0, 0, 0, 0);
         l->setSpacing(2);
 
-        // toolbar row
-        QHBoxLayout *toolbar = new QHBoxLayout;
+        // toolbar row — compact control strip
+        QWidget *toolbarWidget = new QWidget;
+        toolbarWidget->setObjectName("modelToolbar");
+        QHBoxLayout *toolbar = new QHBoxLayout(toolbarWidget);
+        toolbar->setContentsMargins(6, 4, 6, 4);
+        toolbar->setSpacing(4);
+
         QLabel *title = new QLabel("3D Model View");
-        title->setStyleSheet("QLabel { font-weight: bold; font-size: 11px; color: #ccc; }");
-        m_resetBtn = new QPushButton("Reset Camera");
-        m_resetBtn->setFixedHeight(22);
-        m_resetBtn->setStyleSheet(
-            "QPushButton { background:#2a2a2a; color:#bbb; border:1px solid #444;"
-            " border-radius:3px; padding:0 8px; font-size:11px; }"
-            "QPushButton:hover { background:#3a3a3a; }");
+        title->setStyleSheet("QLabel { font-weight: 600; font-size: 11px; color: #6B7280; }");
+
+        auto makeBtn = [](const QString &text) {
+            auto *b = new QPushButton(text);
+            b->setCheckable(true);
+            return b;
+        };
+
+        m_camFreeBtn = makeBtn("Free");
+        m_camTopBtn  = makeBtn("Top");
+        m_camBackBtn = makeBtn("Back");
+        m_camFreeBtn->setChecked(true);
+
+        connect(m_camFreeBtn, &QPushButton::clicked, this, [this]{ onCameraMode(0); });
+        connect(m_camTopBtn,  &QPushButton::clicked, this, [this]{ onCameraMode(1); });
+        connect(m_camBackBtn, &QPushButton::clicked, this, [this]{ onCameraMode(2); });
+
+        m_resetBtn = new QPushButton("Reset");
         connect(m_resetBtn, &QPushButton::clicked, this, &RobotModelWidget::onResetCamera);
+
+        auto *clearTrailBtn = new QPushButton("Clear Trail");
+        connect(clearTrailBtn, &QPushButton::clicked, this, &RobotModelWidget::onClearTrail);
+
+        auto *zoomInBtn  = new QPushButton("+");
+        auto *zoomOutBtn = new QPushButton("−");
+        zoomInBtn->setObjectName("modelZoomBtn");
+        zoomOutBtn->setObjectName("modelZoomBtn");
+
+#ifdef HAVE_QT_OPENGL
+        connect(zoomInBtn,  &QPushButton::clicked, this, [this]{ if (m_glView) m_glView->zoomIn();  });
+        connect(zoomOutBtn, &QPushButton::clicked, this, [this]{ if (m_glView) m_glView->zoomOut(); });
+#endif
+
         toolbar->addWidget(title);
         toolbar->addStretch();
+        toolbar->addWidget(m_camFreeBtn);
+        toolbar->addWidget(m_camTopBtn);
+        toolbar->addWidget(m_camBackBtn);
+        toolbar->addSpacing(4);
+        toolbar->addWidget(zoomOutBtn);
+        toolbar->addWidget(zoomInBtn);
+        toolbar->addSpacing(4);
+        toolbar->addWidget(clearTrailBtn);
         toolbar->addWidget(m_resetBtn);
-        l->addLayout(toolbar);
+        l->addWidget(toolbarWidget);
 
 #ifdef HAVE_QT_OPENGL
         m_glView = new ModelGLView(viewPage);
@@ -181,11 +219,11 @@ void RobotModelWidget::setupUI()
     QHBoxLayout *statusLayout = new QHBoxLayout(statusBar);
     statusLayout->setContentsMargins(4, 2, 4, 2);
     statusLayout->setSpacing(8);
-    statusBar->setStyleSheet("background: #1a1a1c; border-radius: 3px;");
+    statusBar->setStyleSheet("background: #F4F5F7; border-top: 1px solid #E5E7EB;");
 
     // Battery
     QLabel *batIcon = new QLabel("⚡");
-    batIcon->setStyleSheet("color:#aaa; font-size:11px;");
+    batIcon->setStyleSheet("color:#6B7280; font-size:11px;");
     statusLayout->addWidget(batIcon);
 
     m_batteryBar = new QProgressBar;
@@ -194,19 +232,19 @@ void RobotModelWidget::setupUI()
     m_batteryBar->setFixedSize(60, 10);
     m_batteryBar->setTextVisible(false);
     m_batteryBar->setStyleSheet(
-        "QProgressBar { border:none; border-radius:3px; background:#333; }"
+        "QProgressBar { border:none; border-radius:3px; background:#E5E7EB; }"
         "QProgressBar::chunk { background:#4CAF50; border-radius:3px; }");
     statusLayout->addWidget(m_batteryBar);
 
     m_batteryLabel = new QLabel("100%");
-    m_batteryLabel->setStyleSheet("QLabel { font-size:11px; color:#aaa; min-width:34px; }");
+    m_batteryLabel->setStyleSheet("QLabel { font-size:11px; color:#6B7280; min-width:34px; }");
     statusLayout->addWidget(m_batteryLabel);
 
     statusLayout->addStretch();
 
     // Wheel dots
-    QLabel *wIcon = new QLabel("●●● Wheels:");
-    wIcon->setStyleSheet("color:#888; font-size:10px;");
+    QLabel *wIcon = new QLabel("Wheels:");
+    wIcon->setStyleSheet("color:#9CA3AF; font-size:10px; font-weight:600; letter-spacing:0.4px;");
     statusLayout->addWidget(wIcon);
 
     for (int i = 0; i < 3; ++i) {
@@ -224,8 +262,8 @@ void RobotModelWidget::startLoading()
 {
     QString path = findModelFile();
     if (path.isEmpty()) {
-        m_loadLabel->setText("Model file not found (box.obj)");
-        Logger::instance().warning("RobotModelWidget: box.obj not found");
+        m_loadLabel->setText("Model file not found (robot.obj)");
+        Logger::instance().warning("RobotModelWidget: robot.obj not found");
         m_stack->setCurrentIndex(2);
         return;
     }
@@ -327,7 +365,7 @@ void RobotModelWidget::updateBatteryDisplay(double level)
     // Recolor bar: green > 50%, yellow 20–50%, red < 20%
     QString chunkColor = pct > 50 ? "#4CAF50" : (pct > 20 ? "#FFC107" : "#F44336");
     m_batteryBar->setStyleSheet(
-        "QProgressBar { border:none; border-radius:3px; background:#333; }"
+        "QProgressBar { border:none; border-radius:3px; background:#E5E7EB; }"
         "QProgressBar::chunk { background:" + chunkColor + "; border-radius:3px; }");
 
 #ifdef HAVE_QT_OPENGL
@@ -344,7 +382,8 @@ void RobotModelWidget::updateWheelStatus(const QString &robotStatus)
     for (int i = 0; i < 3; ++i) {
         m_wheelDots[i]->setStyleSheet("font-size:11px; font-weight:bold; " + css);
 #ifdef HAVE_QT_OPENGL
-        m_glView->setColorOverride(WHEEL_OBJECT_NAMES[i], color3d);
+        if (i < WHEEL_OBJECT_NAMES.size())
+            m_glView->setColorOverride(WHEEL_OBJECT_NAMES[i], color3d);
 #endif
     }
 }
@@ -352,6 +391,31 @@ void RobotModelWidget::updateWheelStatus(const QString &robotStatus)
 void RobotModelWidget::onResetCamera()
 {
 #ifdef HAVE_QT_OPENGL
-    if (m_glView) m_glView->resetCamera();
+    if (m_glView) {
+        m_glView->resetCamera();   // switches back to Orbit
+        m_camFreeBtn->setChecked(true);
+        m_camTopBtn->setChecked(false);
+        m_camBackBtn->setChecked(false);
+    }
+#endif
+}
+
+void RobotModelWidget::onClearTrail()
+{
+#ifdef HAVE_QT_OPENGL
+    if (m_glView) m_glView->clearTrail();
+#endif
+}
+
+void RobotModelWidget::onCameraMode(int mode)
+{
+#ifdef HAVE_QT_OPENGL
+    if (!m_glView) return;
+    m_camFreeBtn->setChecked(mode == 0);
+    m_camTopBtn->setChecked(mode == 1);
+    m_camBackBtn->setChecked(mode == 2);
+    m_glView->setCameraMode(static_cast<ModelGLView::CameraMode>(mode));
+#else
+    Q_UNUSED(mode)
 #endif
 }

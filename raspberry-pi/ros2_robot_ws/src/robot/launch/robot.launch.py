@@ -15,13 +15,22 @@ def generate_launch_description():
 
         Node(
             package='motor_control',
-            executable='motor_driver',
-            name='motor_driver',
+            executable='spi_controller_bridge',
+            name='spi_controller_bridge',
             output='screen',
             parameters=[
+                {'cmd_vel_topic': '/cmd_vel'},
+                {'servo1_topic': '/servo1/angle'},
+                {'servo2_topic': '/servo2/angle'},
+                {'spi_device': '/dev/spidev0.0'},
+                {'spi_mode': 0},
+                {'spi_bits_per_word': 8},
+                {'spi_speed_hz': 500000},
                 {'wheel_base': 0.2},
-                {'wheel_radius': 0.05},
-                {'max_speed': 1.0},
+                {'max_linear_velocity': 1.0},
+                {'cmd_timeout_sec': 0.5},
+                {'tx_rate_hz': 20.0},
+                {'default_servo_angle': 90},
             ],
             emulate_tty=True,
         ),
@@ -32,9 +41,8 @@ def generate_launch_description():
             name='imu_node',
             output='screen',
             parameters=[
-                {'update_rate': 50.0},
-                {'i2c_bus': 1},
-                {'i2c_address': 0x68},
+                {'serial_port': 'auto'},   # auto-detects NODE_ID:sensor_node
+                {'publish_rate_hz': 50.0},
             ],
             emulate_tty=True,
         ),
@@ -51,6 +59,24 @@ def generate_launch_description():
                 {'publish_rate': 30.0},
                 {'frame_id': 'camera_link'},
                 {'camera_topic': '/camera/raw'},
+            ],
+            emulate_tty=True,
+        ),
+
+        Node(
+            package='yolo_detection',
+            executable='yolo_detection_node',
+            name='yolo_detection_node',
+            output='screen',
+            parameters=[
+                {'model_path': ''},  # Set model path in robot_config.yaml
+                {'confidence_threshold': 0.25},
+                {'iou_threshold': 0.45},
+                {'input_size': 640},
+                {'camera_topic': '/camera/raw'},
+                {'annotated_topic': '/camera/detection'},
+                {'results_topic': '/detections/results'},
+                {'enable_visualization': True},
             ],
             emulate_tty=True,
         ),
@@ -80,6 +106,25 @@ def generate_launch_description():
                 {'max_linear_velocity': 1.0},
                 {'max_angular_velocity': 2.0},
                 {'min_battery_voltage': 7.0},
+            ],
+            emulate_tty=True,
+        ),
+
+        Node(
+            package='mqtt_bridge',
+            executable='mqtt_bridge_node',
+            name='mqtt_bridge_node',
+            output='screen',
+            parameters=[
+                {'mqtt_host': 'sanilinux.mullet-bull.ts.net'},
+                {'mqtt_port': 1883},
+                {'mqtt_keepalive': 60},
+                {'odom_rate_hz': 1.0},
+                {'image_rate_hz': 0.5},   # annotated detection frames → robot/image
+                {'imu_rate_hz': 1.0},     # IMU heading/accel/gyro → robot/imu
+                {'image_format': 'jpeg'}, # JPEG is smaller and faster over MQTT
+                {'image_quality': 80},    # good quality/size balance
+                {'camera_detection_transport': 'compressed'},  # /camera/detection is CompressedImage (YOLO output)
             ],
             emulate_tty=True,
         ),

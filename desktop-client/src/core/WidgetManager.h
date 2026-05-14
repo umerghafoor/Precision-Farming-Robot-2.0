@@ -28,6 +28,9 @@ public:
         Sidebar,            // unified motion+command control panel
         SensorData,
         Coordinates,
+        DetectionSummary,
+        CurrentDetection,
+        DetectionPanel,     // merged CurrentDetection + DetectionSummary
         TwinVisualization,
         RobotModel3D,
         Custom

@@ -9,6 +9,8 @@
 #include <QTimer>
 #include <QPropertyAnimation>
 
+class ZoomableImageView;
+
 /**
  * @brief Widget for displaying video streams from robot cameras
  */
@@ -25,10 +27,14 @@ public:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private slots:
-    void onImageReceived(const QByteArray& imageData, int width, int height);
+    void onImageReceived(const QString& topic, const QByteArray& imageData, int width, int height);
     void onStreamTabChanged(int index);
+    void onZoomInClicked();
+    void onZoomOutClicked();
     void onToggleRecording();
     void onRobotStatusUpdated(const QString& status);
 
@@ -38,8 +44,10 @@ private:
     void updateOverlayInfo(int width, int height);
 
     QWidget* m_videoContainer;
-    QLabel* m_videoLabel;
+    ZoomableImageView* m_videoLabel;
     QTabBar* m_tabBar;
+    QPushButton* m_zoomInButton;
+    QPushButton* m_zoomOutButton;
     QLabel* m_topicOverlay;
     QLabel* m_resolutionOverlay;
     QLabel* m_statusOverlay;

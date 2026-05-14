@@ -1,170 +1,131 @@
-# Image Publisher for ROS2
+# `test_nodes/camera_pub_raw/` — Camera Test Publisher
 
-This is a ROS2 node that publishes images from the `data` folder to the `camera/raw` topic for testing purposes.
+A standalone ROS2 Python node that publishes static images from the `data/` folder to `camera/raw`. Used for offline testing of the vision pipeline (ArUco processor, weed detection, desktop client) without a physical camera.
+
+---
+
+## Included Test Images
+
+| File | Contents |
+|------|---------|
+| `test_scene_1_aruco.jpg` | Field scene with ArUco marker(s) |
+| `test_scene_2_aruco.jpg` | Field scene with ArUco marker(s) |
+| `test_scene_with_aruco.jpg` | Combined test scene |
+
+Place additional test images in `data/` in any supported format.
+
+---
 
 ## Prerequisites
 
-- ROS2 (Humble, Iron, or later)
+- ROS2 (Jazzy recommended; Humble/Iron also work)
 - Python 3
-- OpenCV
-- cv_bridge
+- `opencv-python`
+- `cv_bridge`
 
-## Installation
-
-1. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
+sudo apt install ros-<distro>-cv-bridge
+source /opt/ros/<distro>/setup.bash
 ```
 
-2. Make sure ROS2 is sourced:
-```bash
-source /opt/ros/<your-ros-distro>/setup.bash
-```
+---
 
-3. Install cv_bridge if not already installed:
-```bash
-sudo apt-get install ros-<your-ros-distro>-cv-bridge
-```
+## Running
 
-## Setup
-
-1. Place your test images in the `data` folder
-   - Supported formats: JPG, JPEG, PNG, BMP, TIFF
-   - Images will be published in alphabetical order
-   - The node will automatically loop through all images
-
-## Running the Node
-
-### Basic Usage
+### Basic (default 10 Hz, 3 seconds per image)
 
 ```bash
 python3 main.py
 ```
 
-This will:
-- Load all images from the `data` folder
-- Publish them at 10 Hz to the `camera/raw` topic
-- Loop continuously through the images
-- Add frame counter overlay on each image
-
-### With Custom Parameters
-
-You can customize the publishing behavior using ROS2 parameters:
+### Custom parameters
 
 ```bash
 python3 main.py --ros-args \
   -p publish_rate:=30.0 \
+  -p frames_per_image:=90 \
   -p data_folder:=data \
   -p loop:=true \
-  -p frames_per_image:=90 \
-  -p resize_width:=1920 \
-  -p resize_height:=1080
+  -p resize_width:=640 \
+  -p resize_height:=480
 ```
 
-### Available Parameters
+### Parameters
 
-- `publish_rate` (float, default: 10.0): Publishing frequency in Hz
-- `data_folder` (string, default: 'data'): Folder containing images (relative to script location)
-- `loop` (bool, default: true): Loop through images continuously
-- `frames_per_image` (int, default: 30): Number of frames to display each image before switching to the next
-  - At 10 Hz, 30 frames = 3 seconds per image
-  - At 30 Hz, 90 frames = 3 seconds per image
-- `resize_width` (int, default: 0): Resize width (0 = keep original size)
-- `resize_height` (int, default: 0): Resize height (0 = keep original size)
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `publish_rate` | `10.0` Hz | Publishing frequency |
+| `data_folder` | `data` | Image folder path (relative to script) |
+| `loop` | `true` | Loop through images indefinitely |
+| `frames_per_image` | `30` | Frames to hold each image before advancing |
+| `resize_width` | `0` | Resize width (`0` = keep original) |
+| `resize_height` | `0` | Resize height (`0` = keep original) |
 
-## Verifying the Topic
+**Duration per image** = `frames_per_image / publish_rate` seconds.
 
-To check if images are being published:
+---
+
+## Quick Reference
+
+| Use case | Command |
+|----------|---------|
+| Default (3 s/image at 10 Hz) | `python3 main.py` |
+| Fast cycle (1 s/image at 30 Hz) | `python3 main.py --ros-args -p publish_rate:=30.0 -p frames_per_image:=30` |
+| Slow slideshow (10 s/image) | `python3 main.py --ros-args -p frames_per_image:=100` |
+| Resize to 640×480 | `python3 main.py --ros-args -p resize_width:=640 -p resize_height:=480` |
+| Publish once, no loop | `python3 main.py --ros-args -p loop:=false` |
+| Custom image folder | `python3 main.py --ros-args -p data_folder:=/path/to/images` |
+
+---
+
+## Supported Image Formats
+
+`.jpg`, `.jpeg`, `.png`, `.bmp`, `.tiff`, `.tif`
+
+Images are published in alphabetical filename order. Each frame has a counter overlay for visual verification.
+
+---
+
+## Verifying the Stream
 
 ```bash
-# List all topics
-ros2 topic list
+# Check topic exists
+ros2 topic list | grep camera
 
-# Check the publishing rate
-ros2 topic hz camera/raw
+# Verify publish rate
+ros2 topic hz /camera/raw
 
-# View topic info
-ros2 topic info camera/raw
-
-# Echo topic (not recommended for images)
-ros2 topic echo camera/raw
-```
-
-## Viewing the Images
-
-You can use `rqt_image_view` to visualize the published images:
-
-```bash
+# View in rqt
 ros2 run rqt_image_view rqt_image_view
+# Select camera/raw from dropdown
 ```
 
-Then select the `camera/raw` topic from the dropdown.
+---
 
-## Example Usage Scenarios
+## Integration with Vision Pipeline
 
-### Default - 3 seconds per image at 10 Hz
+Run the publisher alongside the ArUco processor to test the full detection pipeline without hardware:
+
 ```bash
-python3 main.py
-# Each image shown for 30 frames ÷ 10 Hz = 3 seconds
+# Terminal 1 — publish test images
+python3 test_nodes/camera_pub_raw/main.py
+
+# Terminal 2 — run ArUco processor
+cd weed-detection-node
+python3 weed_detection_node/aruco_processor.py
+
+# Terminal 3 — view annotated output
+ros2 topic echo /image/coordinates
 ```
 
-### High-frequency publishing with fast cycling
-```bash
-python3 main.py --ros-args -p publish_rate:=60.0 -p frames_per_image:=60
-# Each image shown for 1 second (60 frames ÷ 60 Hz)
-```
-
-### Slow slideshow (5 seconds per image)
-```bash
-python3 main.py --ros-args -p publish_rate:=10.0 -p frames_per_image:=50
-# Each image shown for 5 seconds (50 frames ÷ 10 Hz)
-```
-
-### Very slow slideshow (10 seconds per image)
-```bash
-python3 main.py --ros-args -p frames_per_image:=100
-# Each image shown for 10 seconds (100 frames ÷ 10 Hz)
-```
-
-### Resize images to HD resolution
-```bash
-python3 main.py --ros-args -p resize_width:=1920 -p resize_height:=1080
-```
-
-### Publish once without looping
-```bash
-python3 main.py --ros-args -p loop:=false
-```
-
-### Use images from a different folder
-```bash
-python3 main.py --ros-args -p data_folder:=/path/to/my/images
-```
-
-## Image Overlay
-
-Each published image includes an overlay showing:
-- Current frame number
-- Current image index (e.g., "Image: 1/5")
-
-This helps verify the stream is working and images are cycling correctly.
+---
 
 ## Troubleshooting
 
-### No images found
-Make sure your `data` folder contains image files:
-```bash
-ls -la data/
-```
-
-Supported formats: .jpg, .jpeg, .png, .bmp, .tiff, .tif
-
-If you encounter import errors:
-1. Make sure ROS2 is properly sourced
-2. Install cv_bridge: `sudo apt-get install ros-<distro>-cv-bridge`
-3. Install Python packages: `pip install -r requirements.txt`
-
-If the topic doesn't appear:
-1. Check that the node is running: `ros2 node list`
-2. Verify the topic exists: `ros2 topic list`
-3. Check for errors in the node output
+| Problem | Fix |
+|---------|-----|
+| `No images found` | Check `data/` folder exists and contains supported image files |
+| Import error for `cv_bridge` | `sudo apt install ros-<distro>-cv-bridge` |
+| Topic not appearing | Confirm ROS2 is sourced: `echo $ROS_DISTRO` |
+| Node not in `ros2 node list` | Check for Python exception at startup in terminal output |

@@ -121,7 +121,7 @@ if command -v colcon &> /dev/null; then
     echo "  ros2 launch robot robot.launch.py"
     echo ""
     echo "To run individual nodes, use:"
-    echo "  ros2 run motor_control motor_driver"
+    echo "  ros2 run motor_control spi_controller_bridge"
     echo "  ros2 run imu_sensor imu_node"
     echo "  ros2 run encoder_odometry encoder_node"
     echo "  ros2 run robot_controller robot_controller"

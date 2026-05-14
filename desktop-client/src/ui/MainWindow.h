@@ -5,6 +5,7 @@
 #include <QDockWidget>
 #include <QMap>
 #include <QSettings>
+#include <QToolButton>
 #include <memory>
 #include "MaterialDockWidget.h"
 
@@ -44,6 +45,9 @@ private slots:
     void onAddSidebar();         // unified controls panel
     void onAddSensorData();
     void onAddCoordinates();
+    void onAddCurrentDetection();
+    void onAddDetectionSummary();
+    void onAddDetectionPanel();
     void onAddTwinVisualization();
     void onAddRobotModel();
     void onRemoveWidget();
@@ -76,6 +80,7 @@ private:
 
     // UI elements
     QAction* m_connectAction;
+    QToolButton* m_connectBtn{nullptr};
     bool m_ros2Connected;
 
     // persistent badges in title/menu bar

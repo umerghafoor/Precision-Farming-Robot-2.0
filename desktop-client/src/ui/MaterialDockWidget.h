@@ -30,6 +30,7 @@ public:
     void setCardTitle(const QString& title);
 
 protected:
+    bool event(QEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void changeEvent(QEvent* event) override;
 
@@ -49,6 +50,11 @@ private:
     QToolButton* m_closeButton      = nullptr;
 
     bool m_wasFloating = false;
+    // QTBUG-43698 guard: true only when QDockWidget itself saw the MouseButtonPress
+    // and therefore has a valid internal drag state. MouseMove events are only
+    // forwarded to QDockWidget::event() when this flag is set, preventing a null
+    // drag-state dereference when a title-bar button child absorbed the press.
+    bool m_dockSawPress = false;
 };
 
 #endif // MATERIALDOCKWIDGET_H

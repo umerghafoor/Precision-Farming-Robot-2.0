@@ -128,21 +128,20 @@ void DigitalTwin::onVelocityCommand(double linear, double angular)
 {
     if (!m_state) return;
 
-    // In Synchronized mode the real robot moves and /coordinates drives the twin.
-    // In Simulated / Offline mode we integrate the command ourselves.
-    if (m_mode == Mode::Synchronized) return;
-
     TwinState::Velocity vel;
     vel.linear  = QVector3D(linear,  0.0, 0.0); // forward in robot frame
     vel.angular = QVector3D(0.0, 0.0, angular);  // yaw rate
     m_state->setVelocity(vel);
 
-    // Auto-start the simulator on first non-zero command so the user
-    // doesn't have to manually switch to Simulated mode.
+    // Start the simulator so the 3D view reflects movement.
+    // In Synchronized mode, real /coordinates updates override position when
+    // they arrive; the simulator fills in between updates.
     if (!m_simulator->isRunning()) {
         m_simulator->start();
-        m_mode = Mode::Simulated;
-        emit modeChanged(m_mode);
+        if (m_mode != Mode::Synchronized) {
+            m_mode = Mode::Simulated;
+            emit modeChanged(m_mode);
+        }
     }
 }
 
