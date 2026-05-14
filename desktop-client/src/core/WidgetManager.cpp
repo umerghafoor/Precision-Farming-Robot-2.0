@@ -11,6 +11,8 @@
 #include "DetectionPanelWidget.h"
 #include "TwinVisualizationWidget.h"
 #include "RobotModelWidget.h"
+#include "LaserCalibrationWidget.h"
+#include "IMU3DWidget.h"
 #include "Logger.h"
 
 WidgetManager::WidgetManager(QObject *parent)
@@ -31,6 +33,8 @@ WidgetManager::WidgetManager(QObject *parent)
     registerWidget(WidgetType::Coordinates, "Coordinates");
     registerWidget(WidgetType::TwinVisualization, "Digital Twin");
     registerWidget(WidgetType::RobotModel3D, "Robot 3D Model");
+    registerWidget(WidgetType::LaserCalibration, "Laser Calibration");
+    registerWidget(WidgetType::IMU3D, "IMU 3D View");
 }
 
 WidgetManager::~WidgetManager()
@@ -89,6 +93,12 @@ BaseWidget* WidgetManager::createWidget(WidgetType type, QWidget* parent)
             break;
         case WidgetType::RobotModel3D:
             widget = new RobotModelWidget(parent);
+            break;
+        case WidgetType::LaserCalibration:
+            widget = new LaserCalibrationWidget(parent);
+            break;
+        case WidgetType::IMU3D:
+            widget = new IMU3DWidget(parent);
             break;
         case WidgetType::Custom:
             Logger::instance().warning("Custom widget type not implemented");
@@ -157,8 +167,10 @@ QString WidgetManager::generateWidgetId(WidgetType type)
         case WidgetType::DetectionPanel:   typeName = "detection_panel";   break;
         case WidgetType::Coordinates: typeName = "coordinates"; break;
         case WidgetType::TwinVisualization: typeName = "twin"; break;
-        case WidgetType::RobotModel3D: typeName = "model3d"; break;
-        case WidgetType::Custom: typeName = "custom"; break;
+        case WidgetType::RobotModel3D:       typeName = "model3d"; break;
+        case WidgetType::LaserCalibration:   typeName = "laser_cal"; break;
+        case WidgetType::IMU3D:              typeName = "imu3d"; break;
+        case WidgetType::Custom:             typeName = "custom"; break;
     }
     
     return QString("%1_%2").arg(typeName).arg(++m_widgetCounter);

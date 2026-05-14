@@ -16,6 +16,8 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/int16.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 #endif
 
 /**
@@ -46,6 +48,8 @@ public:
     // Publishing methods
     void publishVelocityCommand(double linear_x, double linear_y, double angular_z);
     void publishRobotCommand(const QString& command);
+    void publishServoAngle(int servoId, int angle);   // servoId=1 or 2, angle=0-180
+    void publishLaserCommand(bool on);                // true=LASER_ON, false=LASER_OFF
 
     // Subscription management
     void switchCameraTopic(const QString& topic);
@@ -105,6 +109,9 @@ private:
     // Publishers
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr m_velocityPublisher;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr m_commandPublisher;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr m_servo1Publisher;
+    rclcpp::Publisher<std_msgs::msg::Int16>::SharedPtr m_servo2Publisher;
+    rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr  m_laserClient;
 
     // Subscribers
     mutable QMutex m_imageSubscriptionMutex;

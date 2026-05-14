@@ -33,6 +33,8 @@ public:
         DetectionPanel,     // merged CurrentDetection + DetectionSummary
         TwinVisualization,
         RobotModel3D,
+        LaserCalibration,
+        IMU3D,
         Custom
     };
 

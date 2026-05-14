@@ -81,6 +81,9 @@ void MainWindow::createMenus()
     widgetsMenu->addAction(tr("Add &Digital Twin"), this, &MainWindow::onAddTwinVisualization);
     widgetsMenu->addAction(tr("Add &Robot 3D Model"), this, &MainWindow::onAddRobotModel);
     widgetsMenu->addSeparator();
+    widgetsMenu->addAction(tr("Add &Laser Calibration"), this, &MainWindow::onAddLaserCalibration);
+    widgetsMenu->addAction(tr("Add &IMU 3D View"), this, &MainWindow::onAddIMU3D);
+    widgetsMenu->addSeparator();
     widgetsMenu->addAction(tr("&Remove Widget"), this, &MainWindow::onRemoveWidget);
 
     // ROS2 menu
@@ -382,6 +385,20 @@ void MainWindow::onAddRobotModel()
 {
     auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::RobotModel3D, this);
     addWidgetToDock(widget, "Robot 3D Model");
+}
+
+void MainWindow::onAddLaserCalibration()
+{
+    if (!m_widgetManager) return;
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::LaserCalibration, this);
+    addWidgetToDock(widget, "Laser Calibration");
+}
+
+void MainWindow::onAddIMU3D()
+{
+    if (!m_widgetManager) return;
+    auto widget = m_widgetManager->createWidget(WidgetManager::WidgetType::IMU3D, this);
+    addWidgetToDock(widget, "IMU 3D View");
 }
 
 void MainWindow::onRemoveWidget()

@@ -137,6 +137,13 @@ void ROS2Interface::setupPublishers()
     m_commandPublisher = m_node->create_publisher<std_msgs::msg::String>(
         "/robot_command", 10);
 
+    // Servo publishers
+    m_servo1Publisher = m_node->create_publisher<std_msgs::msg::Int16>("/servo1/angle", 10);
+    m_servo2Publisher = m_node->create_publisher<std_msgs::msg::Int16>("/servo2/angle", 10);
+
+    // Laser service client
+    m_laserClient = m_node->create_client<std_srvs::srv::SetBool>("/laser/set");
+
     Logger::instance().debug("ROS2 publishers created");
 #endif
 }
@@ -357,6 +364,34 @@ void ROS2Interface::publishRobotCommand(const QString& command)
     m_commandPublisher->publish(msg);
 #else
     Logger::instance().debug(QString("Robot command (stub): %1").arg(command));
+#endif
+}
+
+void ROS2Interface::publishServoAngle(int servoId, int angle)
+{
+    const int clamped = std::max(0, std::min(180, angle));
+#ifdef USE_ROS2
+    auto msg = std_msgs::msg::Int16();
+    msg.data = static_cast<int16_t>(clamped);
+    if (servoId == 1 && m_servo1Publisher) {
+        m_servo1Publisher->publish(msg);
+    } else if (servoId == 2 && m_servo2Publisher) {
+        m_servo2Publisher->publish(msg);
+    }
+#else
+    Logger::instance().debug(QString("Servo%1 angle (stub): %2").arg(servoId).arg(clamped));
+#endif
+}
+
+void ROS2Interface::publishLaserCommand(bool on)
+{
+#ifdef USE_ROS2
+    if (!m_laserClient) return;
+    auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+    req->data = on;
+    m_laserClient->async_send_request(req);
+#else
+    Logger::instance().debug(QString("Laser command (stub): %1").arg(on ? "ON" : "OFF"));
 #endif
 }
 
