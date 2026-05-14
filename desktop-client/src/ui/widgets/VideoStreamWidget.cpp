@@ -31,12 +31,15 @@ void VideoStreamWidget::setupUI()
     mainLayout->setSpacing(6);
 
     QWidget* headerRow = new QWidget(this);
+    headerRow->setObjectName("videoHeaderBar");
     QHBoxLayout* headerLayout = new QHBoxLayout(headerRow);
-    headerLayout->setContentsMargins(0, 0, 0, 0);
+    headerLayout->setContentsMargins(8, 4, 8, 4);
     headerLayout->setSpacing(6);
 
     // Tab bar for stream sources
     m_tabBar = new QTabBar(headerRow);
+    m_tabBar->setObjectName("streamTabBar");
+    m_tabBar->setExpanding(false);
     // start timer used for fps calculations
     m_frameTimer.start();
     m_tabBar->addTab("Color JPEG");
@@ -52,14 +55,16 @@ void VideoStreamWidget::setupUI()
     zoomLayout->setContentsMargins(0, 0, 0, 0);
     zoomLayout->setSpacing(4);
 
-    m_zoomOutButton = new QPushButton("-");
-    m_zoomOutButton->setFixedWidth(32);
+    m_zoomOutButton = new QPushButton("−");
+    m_zoomOutButton->setObjectName("videoZoomBtn");
+    m_zoomOutButton->setFixedSize(26, 26);
     m_zoomOutButton->setToolTip("Zoom out");
     connect(m_zoomOutButton, &QPushButton::clicked,
         this, &VideoStreamWidget::onZoomOutClicked);
 
     m_zoomInButton = new QPushButton("+");
-    m_zoomInButton->setFixedWidth(32);
+    m_zoomInButton->setObjectName("videoZoomBtn");
+    m_zoomInButton->setFixedSize(26, 26);
     m_zoomInButton->setToolTip("Zoom in");
     connect(m_zoomInButton, &QPushButton::clicked,
         this, &VideoStreamWidget::onZoomInClicked);

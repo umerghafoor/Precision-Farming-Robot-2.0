@@ -8,6 +8,7 @@
 #include "CoordinatesWidget.h"
 #include "CurrentDetectionWidget.h"
 #include "DetectionSummaryWidget.h"
+#include "DetectionPanelWidget.h"
 #include "TwinVisualizationWidget.h"
 #include "RobotModelWidget.h"
 #include "Logger.h"
@@ -26,6 +27,7 @@ WidgetManager::WidgetManager(QObject *parent)
     registerWidget(WidgetType::SensorData, "Sensor Data");
     registerWidget(WidgetType::CurrentDetection, "Current Detection");
     registerWidget(WidgetType::DetectionSummary, "Detection Summary");
+    registerWidget(WidgetType::DetectionPanel, "Detection Panel");
     registerWidget(WidgetType::Coordinates, "Coordinates");
     registerWidget(WidgetType::TwinVisualization, "Digital Twin");
     registerWidget(WidgetType::RobotModel3D, "Robot 3D Model");
@@ -75,6 +77,9 @@ BaseWidget* WidgetManager::createWidget(WidgetType type, QWidget* parent)
             break;
         case WidgetType::DetectionSummary:
             widget = new DetectionSummaryWidget(parent);
+            break;
+        case WidgetType::DetectionPanel:
+            widget = new DetectionPanelWidget(parent);
             break;
         case WidgetType::Coordinates:
             widget = new CoordinatesWidget(parent);
@@ -149,6 +154,7 @@ QString WidgetManager::generateWidgetId(WidgetType type)
         case WidgetType::SensorData: typeName = "sensor"; break;
         case WidgetType::CurrentDetection: typeName = "current_detection"; break;
         case WidgetType::DetectionSummary: typeName = "detection_summary"; break;
+        case WidgetType::DetectionPanel:   typeName = "detection_panel";   break;
         case WidgetType::Coordinates: typeName = "coordinates"; break;
         case WidgetType::TwinVisualization: typeName = "twin"; break;
         case WidgetType::RobotModel3D: typeName = "model3d"; break;

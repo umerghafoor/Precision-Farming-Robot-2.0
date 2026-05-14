@@ -30,6 +30,7 @@ public:
         Coordinates,
         DetectionSummary,
         CurrentDetection,
+        DetectionPanel,     // merged CurrentDetection + DetectionSummary
         TwinVisualization,
         RobotModel3D,
         Custom
