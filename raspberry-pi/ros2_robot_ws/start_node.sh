@@ -184,10 +184,10 @@ action_all_nodes() {
   else
     echo "  SKIP spi_controller_bridge: /dev/spidev0.0 not found (SPI disabled)"
   fi
-  start_node imu_node ros2 run imu_sensor imu_node --ros-args \
-    -p update_rate:=50.0 \
-    -p i2c_bus:=1 \
-    -p i2c_address:=0x68
+  # start_node imu_node ros2 run imu_sensor imu_node --ros-args \
+  #   -p update_rate:=50.0 \
+  #   -p i2c_bus:=1 \
+  #   -p i2c_address:=0x68
   start_node webcam_node ros2 run camera_sensor webcam_node --ros-args \
     -p device_index:="$device_index" \
     -p image_width:=640 \
@@ -210,12 +210,12 @@ action_all_nodes() {
     -p wheel_base:=0.2 \
     -p counts_per_rev:=20 \
     -p update_rate:=20.0
-  start_node robot_controller ros2 run robot_controller robot_controller --ros-args \
-    -p control_loop_rate:=20.0 \
-    -p emergency_stop_enabled:=true \
-    -p max_linear_velocity:=1.0 \
-    -p max_angular_velocity:=2.0 \
-    -p min_battery_voltage:=7.0
+  # start_node robot_controller ros2 run robot_controller robot_controller --ros-args \
+  #   -p control_loop_rate:=20.0 \
+  #   -p emergency_stop_enabled:=true \
+  #   -p max_linear_velocity:=1.0 \
+  #   -p max_angular_velocity:=2.0 \
+  #   -p min_battery_voltage:=7.0
   start_node mqtt_bridge ros2 run mqtt_bridge mqtt_bridge_node --ros-args \
     -p mqtt_host:="$MQTT_HOST" \
     -p mqtt_port:="$MQTT_PORT" \

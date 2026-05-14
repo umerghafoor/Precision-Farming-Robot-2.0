@@ -29,12 +29,11 @@ static std::vector<std::string> listUsbPorts() {
   return ports;
 }
 
-static bool configureSerial(int fd, int baud) {
+static bool configureSerial(int fd, int /*baud*/) {
   struct termios tty{};
   if (tcgetattr(fd, &tty) != 0) return false;
   cfsetispeed(&tty, B115200);
   cfsetospeed(&tty, B115200);
-  (void)baud;  // only 115200 used
   cfmakeraw(&tty);
   tty.c_cc[VMIN]  = 0;
   tty.c_cc[VTIME] = 10;  // 1 s read timeout (tenths of seconds)
@@ -44,7 +43,8 @@ static bool configureSerial(int fd, int baud) {
 // Read one '\n'-terminated line from fd (blocking up to timeout_ms).
 static std::string readLine(int fd, int timeout_ms = 1000) {
   std::string line;
-  auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  auto deadline = std::chrono::steady_clock::now() +
+                  std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
     char c;
     ssize_t n = read(fd, &c, 1);
@@ -67,8 +67,9 @@ IMUNode::IMUNode() : Node("imu_node") {
 
   serial_port_ = detectPort(port_param);
   if (serial_port_.empty()) {
-    throw std::runtime_error("sensor_node not found on any USB port. "
-                             "Set serial_port parameter or check connections.");
+    throw std::runtime_error(
+      "sensor_node not found on any USB port. "
+      "Set serial_port parameter or check connections.");
   }
 
   if (!openSerial(serial_port_, 115200)) {
@@ -77,26 +78,33 @@ IMUNode::IMUNode() : Node("imu_node") {
 
   RCLCPP_INFO(get_logger(), "Sensor node connected on %s", serial_port_.c_str());
 
-  // Publishers
+  // ── Publishers ────────────────────────────────────────────────────────────
   imu_pub_         = create_publisher<sensor_msgs::msg::Imu>("/imu/data", 10);
   laser_state_pub_ = create_publisher<std_msgs::msg::Bool>("/laser/state", 10);
 
-  // Laser service: call with data=true to turn ON, data=false to turn OFF
+  // ── Laser service: SetBool — true=ON, false=OFF ───────────────────────────
   laser_srv_ = create_service<std_srvs::srv::SetBool>(
     "/laser/set",
     std::bind(&IMUNode::laserServiceCallback, this,
               std::placeholders::_1, std::placeholders::_2));
 
-  // Publish timer
+  // ── Laser topic: /laser/cmd — Bool, mirrors the service ──────────────────
+  laser_sub_ = create_subscription<std_msgs::msg::Bool>(
+    "/laser/cmd", 10,
+    std::bind(&IMUNode::laserTopicCallback, this, std::placeholders::_1));
+
+  // ── Publish timer ─────────────────────────────────────────────────────────
   auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
     std::chrono::duration<double>(1.0 / hz));
-  publish_timer_ = create_wall_timer(period, std::bind(&IMUNode::publishCallback, this));
+  publish_timer_ =
+    create_wall_timer(period, std::bind(&IMUNode::publishCallback, this));
 
-  // Background serial reader
-  stop_reader_ = false;
-  reader_thread_ = std::thread(&IMUNode::readerLoop, this);
+  // ── Background serial reader ──────────────────────────────────────────────
+  stop_reader_    = false;
+  reader_thread_  = std::thread(&IMUNode::readerLoop, this);
 
-  RCLCPP_INFO(get_logger(), "IMU node ready. publish=%.0f Hz  laser=/laser/set", hz);
+  RCLCPP_INFO(get_logger(),
+    "IMU node ready — publish=%.0f Hz  laser=/laser/set|/laser/cmd", hz);
 }
 
 IMUNode::~IMUNode() {
@@ -139,17 +147,16 @@ std::string IMUNode::detectPort(const std::string & hint) {
     }
     tcflush(fd, TCIFLUSH);
 
-    // Send WHOAMI
+    // Send WHOAMI and read reply (up to 2 s)
     const char * whoami = "WHOAMI\n";
     write(fd, whoami, strlen(whoami));
 
-    // Read reply (up to 2 s)
     auto reply_end = std::chrono::steady_clock::now() + 2000ms;
     bool found = false;
     while (std::chrono::steady_clock::now() < reply_end) {
       std::string line = readLine(fd, 200);
       if (line == target) { found = true; break; }
-      if (!line.empty() && line.rfind("NODE_ID:", 0) == 0) break;  // wrong node
+      if (!line.empty() && line.rfind("NODE_ID:", 0) == 0) break;
     }
 
     close(fd);
@@ -173,7 +180,6 @@ bool IMUNode::openSerial(const std::string & port, int baud) {
     serial_fd_ = -1;
     return false;
   }
-  // Flush startup noise
   std::this_thread::sleep_for(100ms);
   tcflush(serial_fd_, TCIFLUSH);
   return true;
@@ -186,10 +192,18 @@ void IMUNode::closeSerial() {
   }
 }
 
+// Mutex-protected write — prevents reader thread and ROS callbacks racing on fd
+bool IMUNode::serialWrite(const char * cmd) {
+  std::lock_guard<std::mutex> lk(write_mutex_);
+  if (serial_fd_ < 0) return false;
+  ssize_t len = static_cast<ssize_t>(strlen(cmd));
+  return write(serial_fd_, cmd, len) == len;
+}
+
 // ── Serial reader thread ──────────────────────────────────────────────────────
 
 void IMUNode::readerLoop() {
-  // A:ax,ay,az G:gx,gy,gz
+  // A:<ax>,<ay>,<az> G:<gx>,<gy>,<gz>
   const std::regex imu_re(
     R"(A:(-?\d+),(-?\d+),(-?\d+)\s+G:(-?\d+),(-?\d+),(-?\d+))");
 
@@ -244,39 +258,37 @@ void IMUNode::publishCallback() {
   msg.angular_velocity_covariance[4] = 0.001;
   msg.angular_velocity_covariance[8] = 0.001;
 
-  // Orientation unknown
-  msg.orientation_covariance[0] = -1.0;
+  msg.orientation_covariance[0] = -1.0;  // orientation unknown
 
   imu_pub_->publish(msg);
 }
 
-void IMUNode::laserServiceCallback(
-  const std_srvs::srv::SetBool::Request::SharedPtr  req,
-  const std_srvs::srv::SetBool::Response::SharedPtr res)
-{
-  if (serial_fd_ < 0) {
-    res->success = false;
-    res->message = "Serial port not open";
+void IMUNode::applyLaser(bool on) {
+  const char * cmd = on ? "LASER_ON\n" : "LASER_OFF\n";
+  if (!serialWrite(cmd)) {
+    RCLCPP_WARN(get_logger(), "Laser command write failed (serial not open?)");
     return;
   }
-
-  const char * cmd = req->data ? "LASER_ON\n" : "LASER_OFF\n";
-  ssize_t written = write(serial_fd_, cmd, strlen(cmd));
-  if (written < 0) {
-    res->success = false;
-    res->message = "Serial write failed";
-    return;
-  }
-
-  laser_on_ = req->data;
-  res->success = true;
-  res->message = laser_on_ ? "Laser ON" : "Laser OFF";
+  laser_on_ = on;
 
   std_msgs::msg::Bool state_msg;
   state_msg.data = laser_on_;
   laser_state_pub_->publish(state_msg);
 
   RCLCPP_INFO(get_logger(), "Laser %s", laser_on_ ? "ON" : "OFF");
+}
+
+void IMUNode::laserServiceCallback(
+  const std_srvs::srv::SetBool::Request::SharedPtr  req,
+  const std_srvs::srv::SetBool::Response::SharedPtr res)
+{
+  applyLaser(req->data);
+  res->success = true;
+  res->message = laser_on_ ? "Laser ON" : "Laser OFF";
+}
+
+void IMUNode::laserTopicCallback(const std_msgs::msg::Bool::SharedPtr msg) {
+  applyLaser(msg->data);
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────

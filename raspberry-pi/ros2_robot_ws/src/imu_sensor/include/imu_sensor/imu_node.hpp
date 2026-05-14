@@ -7,6 +7,7 @@
 #include <std_srvs/srv/set_bool.hpp>
 
 #include <atomic>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -23,6 +24,10 @@ private:
   bool openSerial(const std::string & port, int baud);
   void closeSerial();
 
+  // Serialize all writes to serial_fd_ (reader thread reads, callbacks write)
+  std::mutex  write_mutex_;
+  bool serialWrite(const char * cmd);
+
   // Auto-detect: drain IMU flood, send WHOAMI, confirm NODE_ID:sensor_node
   std::string detectPort(const std::string & hint);
 
@@ -38,24 +43,28 @@ private:
   bool  imu_fresh_{false};
 
   // ── ROS interfaces ────────────────────────────────────────────────────────
-  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr  imu_pub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr    laser_state_pub_;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr   laser_srv_;
-  rclcpp::TimerBase::SharedPtr                         publish_timer_;
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr   imu_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr     laser_state_pub_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr    laser_srv_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr  laser_sub_;
+  rclcpp::TimerBase::SharedPtr                          publish_timer_;
 
   void publishCallback();
   void laserServiceCallback(
     const std_srvs::srv::SetBool::Request::SharedPtr  req,
     const std_srvs::srv::SetBool::Response::SharedPtr res);
+  void laserTopicCallback(const std_msgs::msg::Bool::SharedPtr msg);
+
+  void applyLaser(bool on);
 
   // ── State ─────────────────────────────────────────────────────────────────
   bool laser_on_{false};
 
   // ── Scaling factors (must match firmware_sensors/main.py) ─────────────────
   // Firmware sends: ax = accel_g * 1000,  gx = gyro_dps * 10
-  static constexpr float ACC_SCALE = 1000.0f;  // → g
-  static constexpr float GYR_SCALE = 10.0f;    // → dps
-  static constexpr float G_TO_MS2  = 9.80665f;
+  static constexpr float ACC_SCALE  = 1000.0f;
+  static constexpr float GYR_SCALE  = 10.0f;
+  static constexpr float G_TO_MS2   = 9.80665f;
   static constexpr float DEG_TO_RAD = 0.017453293f;
 };
 
