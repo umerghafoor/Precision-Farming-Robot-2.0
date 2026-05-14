@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -148,30 +149,36 @@ std::string SPIControllerBridge::detectSerialPort(const std::string & hint) {
   const std::string target = "NODE_ID:motor_controller";
 
   for (const auto & port : ports) {
+    RCLCPP_INFO(get_logger(), "Trying %s ...", port.c_str());
+
     int fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd < 0) continue;
+    // Switch to blocking with termios timeout
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
 
     if (!configureSerial(fd)) { close(fd); continue; }
 
-    // Drain 1 s of any startup noise (motor controller may be printing)
-    auto drain_end = std::chrono::steady_clock::now() + 1000ms;
-    while (std::chrono::steady_clock::now() < drain_end) {
-      char buf[64];
-      if (read(fd, buf, sizeof(buf)) <= 0) break;
-    }
-    tcflush(fd, TCIFLUSH);
+    // Toggle DTR low→high to force Arduino reset (same as firmware/main.py)
+    // DTR is controlled via TIOCM_DTR ioctl
+    int modem_bits = 0;
+    ioctl(fd, TIOCMGET, &modem_bits);
+    modem_bits &= ~TIOCM_DTR;          // DTR low
+    ioctl(fd, TIOCMSET, &modem_bits);
+    std::this_thread::sleep_for(100ms);
+    modem_bits |= TIOCM_DTR;           // DTR high — triggers reset
+    ioctl(fd, TIOCMSET, &modem_bits);
+    tcflush(fd, TCIFLUSH);             // discard any pre-reset bytes
 
-    const char * whoami = "WHOAMI\n";
-    write(fd, whoami, strlen(whoami));
-
-    auto reply_end = std::chrono::steady_clock::now() + 2000ms;
+    // Read boot banner for up to 3.5 s (mirrors firmware/main.py deadline)
     bool found = false;
-    while (std::chrono::steady_clock::now() < reply_end) {
-      std::string line = readLine(fd, 200);
+    auto deadline = std::chrono::steady_clock::now() + 3500ms;
+    while (std::chrono::steady_clock::now() < deadline) {
+      std::string line = readLine(fd, 300);
+      if (line.empty()) continue;
+      RCLCPP_DEBUG(get_logger(), "  [%s] %s", port.c_str(), line.c_str());
       if (line == target) { found = true; break; }
-      if (!line.empty() && line.rfind("NODE_ID:", 0) == 0) break;  // different node
+      if (line.rfind("NODE_ID:", 0) == 0) break;  // different node on this port
     }
 
     close(fd);
