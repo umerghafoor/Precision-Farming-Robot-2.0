@@ -156,7 +156,7 @@ action_webcam_only() {
 }
 
 action_all_nodes() {
-  start_node motor_driver ros2 run motor_control motor_driver
+  start_node spi_controller_bridge ros2 run motor_control spi_controller_bridge
   start_node imu_node ros2 run imu_sensor imu_node
   start_node encoder_node ros2 run encoder_odometry encoder_node
   start_node robot_controller ros2 run robot_controller robot_controller
