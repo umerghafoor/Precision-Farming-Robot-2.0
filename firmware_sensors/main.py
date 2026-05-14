@@ -1,359 +1,282 @@
 #!/usr/bin/env python3
 """
-6D Signal USB Serial Master Controller with Keyboard Control
-Sends 6-byte signal to Arduino for motor control via USB Serial
-Control keys: Arrow keys for drive, Q/A for Servo 1, W/S for Servo 2
-Format: [Dir1, Speed1, Dir2, Speed2, Dir3, Speed3]
+Sensor Node Monitor — Arduino Nano (MPU-9250 + Laser)
+
+Reads IMU data printed by the Arduino over USB Serial and renders a
+live curses dashboard. Laser is toggled ON/OFF with SPACE.
+
+Arduino serial format (one line per sample):
+  A:<ax>,<ay>,<az> G:<gx>,<gy>,<gz> M:<mx>,<my>,<mz>
+
+Controls:
+  SPACE  — toggle laser (sends "LASER_ON\n" or "LASER_OFF\n")
+  ESC/Q  — quit
 """
 
-import serial
-import time
-import sys
 import curses
-from time import sleep
+import re
+import sys
+import threading
+import time
+from collections import deque
 
-# Direction constants
-DIR_FORWARD = 0
-DIR_BACKWARD = 1
-DIR_STOP = 2
+import serial
 
-class MotorController:
-    def __init__(self, port='/dev/ttyUSB0', baudrate=115200):
-        """Initialize USB Serial connection"""
-        print("=" * 50)
-        print("6D Signal Motor Controller - USB Serial Master")
-        print("=" * 50)
-        self.port = port
-        self.baudrate = baudrate
-        self.timeout = 1
-        self.serial = None
+# ── Serial config ──────────────────────────────────────────────────────────────
+SERIAL_PORT = "/dev/ttyUSB0"
+BAUD_RATE   = 115200
 
-        if not self._connect_serial(is_initial=True):
-            print("\nMake sure:")
-            print("  1. Arduino is connected via USB")
-            print("  2. Port is correct (check with 'ls /dev/ttyUSB*' or 'ls /dev/ttyACM*')")
-            print("  3. You have permissions to access the port")
-            sys.exit(1)
+# ── IMU scaling (must match firmware) ──────────────────────────────────────────
+# Firmware stores:  ax = accel_g * 1000  → divide by 1000 for g
+#                   gx = gyro_dps * 10   → divide by 10   for dps
+#                   mx = mag_uT * 10     → divide by 10   for µT
+ACC_SCALE = 1000.0
+GYR_SCALE = 10.0
+MAG_SCALE = 10.0
 
-    def _connect_serial(self, is_initial=False):
-        """Open serial port and clear startup noise from MCU reset."""
-        try:
-            self.serial = serial.Serial(self.port, self.baudrate, timeout=self.timeout, write_timeout=1)
-            time.sleep(2)  # Wait for Arduino to reset after serial connection
-            print(f"DEBUG: Serial initialized on port {self.port}")
-            print(f"DEBUG: Baudrate: {self.baudrate}")
-            time.sleep(0.5)
-            self.serial.reset_input_buffer()
-            print("DEBUG: Serial buffer cleared")
-            return True
-        except Exception as e:
-            phase = "initialize" if is_initial else "reconnect"
-            print(f"ERROR: Failed to {phase} serial: {e}")
-            self.serial = None
-            return False
+# ── History length for sparkline bars ─────────────────────────────────────────
+HISTORY = 40
 
-    def _ensure_serial_connection(self):
-        """Verify serial is usable; attempt reconnect if it is not."""
-        if self.serial is not None and self.serial.is_open:
-            return True
+_IMU_RE = re.compile(
+    r"A:(-?\d+),(-?\d+),(-?\d+)\s+G:(-?\d+),(-?\d+),(-?\d+)\s+M:(-?\d+),(-?\d+),(-?\d+)"
+)
 
-        print("WARNING: Serial link is closed. Attempting reconnect...")
-        return self._connect_serial(is_initial=False)
 
-    def _handle_write_failure(self, err):
-        """Handle a write failure and attempt one reconnect for retry."""
-        print(f"ERROR: Serial write failed: {err}")
-        if self.serial is not None:
+class SerialReader:
+    """Background thread: reads IMU lines from the Arduino."""
+
+    def __init__(self, port: str, baud: int):
+        self.port  = port
+        self.baud  = baud
+        self._ser  = None
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._latest = None          # (ax,ay,az,gx,gy,gz,mx,my,mz) raw ints
+        self._error  = None          # last connect error string
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        if self._ser and self._ser.is_open:
             try:
-                if self.serial.is_open:
-                    self.serial.close()
+                self._ser.close()
             except Exception:
                 pass
-            self.serial = None
 
-        print("WARNING: Attempting serial reconnect after write failure...")
-        return self._connect_serial(is_initial=False)
+    def latest(self):
+        with self._lock:
+            return self._latest
 
-    def _read_arduino_output(self, wait_s=0.2):
-        """Read and print any pending Arduino serial lines for a short window."""
-        if self.serial is None or not self.serial.is_open:
-            return
+    def error(self):
+        with self._lock:
+            return self._error
 
-        time.sleep(wait_s)
-        while self.serial.in_waiting > 0:
-            response = self.serial.readline().decode('utf-8', errors='ignore').strip()
-            if response:
-                print(f"  Arduino: {response}")
-    
-    def send_6d_signal(self, motor1_dir, motor1_speed, motor2_dir, motor2_speed, motor3_dir, motor3_speed):
-        """
-        Send 6D signal to Arduino
-        
-        Args:
-            motor1_dir: Direction for motor 1 (0=Forward, 1=Backward, 2=Stop)
-            motor1_speed: Speed for motor 1 (0-255)
-            motor2_dir: Direction for motor 2
-            motor2_speed: Speed for motor 2 (0-255)
-            motor3_dir: Direction for motor 3
-            motor3_speed: Speed for motor 3 (0-255)
-        """
-        signal = [
-            motor1_dir & 0xFF,
-            motor1_speed & 0xFF,
-            motor2_dir & 0xFF,
-            motor2_speed & 0xFF,
-            motor3_dir & 0xFF,
-            motor3_speed & 0xFF
-        ]
-        
-        print("\n--- Sending 6D Signal ---")
-        print(f"Motor 1: Dir={self._dir_name(motor1_dir)}, Speed={motor1_speed}")
-        print(f"Motor 2: Dir={self._dir_name(motor2_dir)}, Speed={motor2_speed}")
-        print(f"Motor 3: Dir={self._dir_name(motor3_dir)}, Speed={motor3_speed}")
-        print(f"RAW DATA: {' '.join(f'0x{b:02X}' for b in signal)}")
-        
-        if not self._ensure_serial_connection():
-            print("ERROR: Cannot send 6D signal because serial is unavailable")
-            return False
+    def send(self, text: str):
+        with self._lock:
+            if self._ser and self._ser.is_open:
+                try:
+                    self._ser.write((text + "\n").encode())
+                    self._ser.flush()
+                except Exception:
+                    pass
 
-        for attempt in range(2):
+    def _run(self):
+        while not self._stop.is_set():
             try:
-                # Send 6 bytes over serial
-                self.serial.write(bytes(signal))
-                self.serial.flush()
-                print("DEBUG: Data sent successfully")
+                self._ser = serial.Serial(self.port, self.baud, timeout=1)
+                time.sleep(2)          # wait for Arduino reset
+                self._ser.reset_input_buffer()
+                with self._lock:
+                    self._error = None
 
-                # Read Arduino's debug output
-                self._read_arduino_output(wait_s=0.2)
+                while not self._stop.is_set():
+                    line = self._ser.readline().decode("utf-8", errors="ignore").strip()
+                    m = _IMU_RE.search(line)
+                    if m:
+                        vals = tuple(int(x) for x in m.groups())
+                        with self._lock:
+                            self._latest = vals
 
-                return True
+            except serial.SerialException as e:
+                with self._lock:
+                    self._error = str(e)
+                    self._latest = None
+                time.sleep(2)
             except Exception as e:
-                if attempt == 0 and self._handle_write_failure(e):
-                    print("INFO: Serial recovered, retrying 6D signal...")
-                    continue
-                print(f"ERROR: Failed to send data: {e}")
-                return False
-
-        return False
-
-    def send_text_command(self, command):
-        """Send newline-delimited text command to Arduino command parser."""
-        if not self._ensure_serial_connection():
-            print(f"ERROR: Cannot send text command '{command}' because serial is unavailable")
-            return False
-
-        payload = f"{command.strip()}\n".encode("utf-8")
-        for attempt in range(2):
-            try:
-                self.serial.write(payload)
-                self.serial.flush()
-                print(f"DEBUG: Text command sent -> {command.strip().upper()}")
-                self._read_arduino_output(wait_s=0.12)
-                return True
-            except Exception as e:
-                if attempt == 0 and self._handle_write_failure(e):
-                    print(f"INFO: Serial recovered, retrying text command '{command.strip().upper()}'...")
-                    continue
-                print(f"ERROR: Failed to send text command '{command}': {e}")
-                return False
-
-        return False
-
-    def set_servo_angle(self, servo_id, angle):
-        """Send absolute angle command to a servo (expects Arduino S1:/S2: parser support)."""
-        if servo_id not in (1, 2):
-            print(f"ERROR: Invalid servo id {servo_id}. Expected 1 or 2.")
-            return False
-        return self.send_text_command(f"S{servo_id}:{angle}")
-    
-    def _dir_name(self, direction):
-        """Convert direction code to readable name"""
-        if direction == DIR_FORWARD:
-            return "FORWARD"
-        elif direction == DIR_BACKWARD:
-            return "BACKWARD"
-        elif direction == DIR_STOP:
-            return "STOP"
-        else:
-            return f"UNKNOWN({direction})"
-    
-    def stop_all(self):
-        """Send stop command to all motors"""
-        print("\nDEBUG: Stopping all motors...")
-        return self.send_6d_signal(DIR_STOP, 0, DIR_STOP, 0, DIR_STOP, 0)
-    
-    def move_forward(self, speed=200):
-        """Move all motors forward"""
-        print(f"\nDEBUG: Moving forward at speed {speed}...")
-        return self.send_6d_signal(DIR_FORWARD, speed, DIR_FORWARD, speed, DIR_FORWARD, speed)
-    
-    def move_backward(self, speed=200):
-        """Move all motors backward"""
-        print(f"\nDEBUG: Moving backward at speed {speed}...")
-        return self.send_6d_signal(DIR_BACKWARD, speed, DIR_BACKWARD, speed, DIR_BACKWARD, speed)
-    
-    def turn_left(self, speed=150):
-        """Turn left (left motors backward, right motors forward)"""
-        print(f"\nDEBUG: Turning left at speed {speed}...")
-        return self.send_6d_signal(DIR_BACKWARD, speed, DIR_FORWARD, speed, DIR_BACKWARD, speed)
-    
-    def turn_right(self, speed=150):
-        """Turn right (left motors forward, right motors backward)"""
-        print(f"\nDEBUG: Turning right at speed {speed}...")
-        return self.send_6d_signal(DIR_FORWARD, speed, DIR_BACKWARD, speed, DIR_FORWARD, speed)
-    
-    def close(self):
-        """Close Serial connection"""
-        print("\nDEBUG: Closing Serial connection...")
-        if self.serial is not None and self.serial.is_open:
-            self.serial.close()
-        print("DEBUG: Serial closed")
+                with self._lock:
+                    self._error = str(e)
+                time.sleep(2)
 
 
-class KeyboardController:
-    """Keyboard control handler for motor + dual-servo keys"""
-    
-    def __init__(self, motor_controller):
-        self.controller = motor_controller
-        self.current_speed = 180
-        self.min_speed = 0
-        self.max_speed = 255
-        self.speed_step = 10
+# ── Sparkline helpers ──────────────────────────────────────────────────────────
 
-    def _adjust_speed(self, delta):
-        self.current_speed = max(self.min_speed, min(self.max_speed, self.current_speed + delta))
-        print(f"\n[KEYBOARD] SPEED -> {self.current_speed}")
+SPARK_CHARS = " ▁▂▃▄▅▆▇█"
 
-    def _prompt_for_angle(self, stdscr, servo_label):
-        """Prompt user for an absolute servo angle in curses mode."""
-        if stdscr is None:
-            print("\n[KEYBOARD] ERROR: Prompt requires curses screen context")
-            return None
-
-        height, width = stdscr.getmaxyx()
-        prompt = f"Enter {servo_label} angle (0-180): "
-        prompt_row = max(0, height - 1)
-        max_input_len = 4
-
-        try:
-            stdscr.nodelay(False)
-            curses.echo()
-
-            stdscr.move(prompt_row, 0)
-            stdscr.clrtoeol()
-            stdscr.addstr(prompt_row, 0, prompt[: max(0, width - 1)])
-            stdscr.refresh()
-
-            input_col = min(len(prompt), max(0, width - 1))
-            raw = stdscr.getstr(prompt_row, input_col, max_input_len).decode("utf-8", errors="ignore").strip()
-        finally:
-            curses.noecho()
-            stdscr.nodelay(True)
-            stdscr.move(prompt_row, 0)
-            stdscr.clrtoeol()
-            stdscr.refresh()
-
-        if not raw:
-            print(f"\n[KEYBOARD] {servo_label}: input cancelled")
-            return None
-
-        try:
-            angle = int(raw)
-        except ValueError:
-            print(f"\n[KEYBOARD] Invalid angle '{raw}'. Enter an integer between 0 and 180.")
-            return None
-
-        if not 0 <= angle <= 180:
-            print(f"\n[KEYBOARD] Angle {angle} out of range. Valid range is 0-180.")
-            return None
-
-        return angle
-
-    def handle_key(self, key, stdscr=None):
-        """Handle a curses key code. Returns False when exit is requested."""
-        if key == curses.KEY_UP:
-            print("\n[KEYBOARD] UP -> FORWARD")
-            self.controller.move_forward(speed=self.current_speed)
-        elif key == curses.KEY_DOWN:
-            print("\n[KEYBOARD] DOWN -> BACKWARD")
-            self.controller.move_backward(speed=self.current_speed)
-        elif key == curses.KEY_LEFT:
-            print("\n[KEYBOARD] LEFT -> TURN LEFT")
-            self.controller.turn_left(speed=150)
-        elif key == curses.KEY_RIGHT:
-            print("\n[KEYBOARD] RIGHT -> TURN RIGHT")
-            self.controller.turn_right(speed=150)
-        elif key in (ord('q'), ord('Q')):
-            print("\n[KEYBOARD] Q -> SERVO 1 LEFT")
-            self.controller.send_text_command("Q")
-        elif key in (ord('a'), ord('A')):
-            print("\n[KEYBOARD] A -> SERVO 1 RIGHT")
-            self.controller.send_text_command("A")
-        elif key in (ord('w'), ord('W')):
-            print("\n[KEYBOARD] W -> SERVO 2 LEFT")
-            self.controller.send_text_command("W")
-        elif key in (ord('s'), ord('S')):
-            print("\n[KEYBOARD] S -> SERVO 2 RIGHT")
-            self.controller.send_text_command("S")
-        elif key in (ord('e'), ord('E')):
-            self._adjust_speed(self.speed_step)
-        elif key in (ord('d'), ord('D')):
-            self._adjust_speed(-self.speed_step)
-        elif key in (ord(' '), ord('x'), ord('X')):
-            print("\n[KEYBOARD] STOP")
-            self.controller.stop_all()
-        elif key in (ord('r'), ord('R')):
-            print("\n[KEYBOARD] R -> CENTER SERVOS")
-            self.controller.send_text_command("CENTER")
-        elif key in (ord('m'), ord('M')):
-            angle = self._prompt_for_angle(stdscr, "Servo 1")
-            if angle is not None:
-                print(f"\n[KEYBOARD] M -> SERVO 1 ANGLE {angle}")
-                self.controller.set_servo_angle(1, angle)
-        elif key in (ord('n'), ord('N')):
-            angle = self._prompt_for_angle(stdscr, "Servo 2")
-            if angle is not None:
-                print(f"\n[KEYBOARD] N -> SERVO 2 ANGLE {angle}")
-                self.controller.set_servo_angle(2, angle)
-        elif key in (ord('u'), ord('U')):
-            print("\n[KEYBOARD] U -> SERVO 1 STOP")
-            self.controller.send_text_command("S1STOP")
-        elif key in (ord('i'), ord('I')):
-            print("\n[KEYBOARD] I -> SERVO 2 STOP")
-            self.controller.send_text_command("S2STOP")
-        elif key == 27:  # ESC
-            print("\n[KEYBOARD] ESC -> EXIT")
-            self.controller.stop_all()
-            return False
-
-        return True
+def _sparkline(history: deque, width: int) -> str:
+    """Return a sparkline string of `width` characters from the deque."""
+    data = list(history)[-width:]
+    if not data:
+        return " " * width
+    lo, hi = min(data), max(data)
+    rng = hi - lo or 1
+    chars = [SPARK_CHARS[int((v - lo) / rng * (len(SPARK_CHARS) - 1))] for v in data]
+    # Pad left
+    pad = width - len(chars)
+    return " " * pad + "".join(chars)
 
 
-def main(stdscr):
-    # Clear screen
-    stdscr.clear()
-    stdscr.nodelay(True)  # Non-blocking input
+def _bar(value: float, full_scale: float, width: int) -> str:
+    """Signed bar centred at zero. Positive fills right, negative fills left."""
+    half = width // 2
+    filled = int(abs(value) / full_scale * half)
+    filled = min(filled, half)
+    if value >= 0:
+        return " " * half + "█" * filled + " " * (half - filled)
+    else:
+        return " " * (half - filled) + "█" * filled + " " * half
+
+
+# ── Main curses UI ─────────────────────────────────────────────────────────────
+
+def run_ui(stdscr, reader: SerialReader):
+    curses.curs_set(0)
+    stdscr.nodelay(True)
     stdscr.keypad(True)
 
-    print("Ready! Controls: Arrow keys=drive, E/D=speed +/- , Q/A=servo1 left/right, W/S=servo2 left/right, M=servo1 absolute value, N=servo2 absolute value, U=servo1 stop, I=servo2 stop, R=center servos, SPACE/X=stop, ESC=exit")
-    
-    # Initialize your motor controller
-    controller = MotorController(port="/dev/ttyUSB0", baudrate=115200)
-    keyboard_controller = KeyboardController(controller)
-    
-    try:
-        while True:
-            key = stdscr.getch()
+    # Colour pairs
+    curses.start_color()
+    curses.use_default_colors()
+    curses.init_pair(1, curses.COLOR_CYAN,    -1)  # header
+    curses.init_pair(2, curses.COLOR_GREEN,   -1)  # value OK
+    curses.init_pair(3, curses.COLOR_YELLOW,  -1)  # label
+    curses.init_pair(4, curses.COLOR_RED,     -1)  # laser ON / error
+    curses.init_pair(5, curses.COLOR_MAGENTA, -1)  # bar
 
-            if key != -1:
-                should_continue = keyboard_controller.handle_key(key, stdscr=stdscr)
-                if not should_continue:
+    HDR   = curses.color_pair(1) | curses.A_BOLD
+    VAL   = curses.color_pair(2)
+    LBL   = curses.color_pair(3)
+    ERR   = curses.color_pair(4) | curses.A_BOLD
+    BAR   = curses.color_pair(5)
+    LASER_ON_ATTR  = curses.color_pair(4) | curses.A_BOLD | curses.A_REVERSE
+    LASER_OFF_ATTR = curses.color_pair(3) | curses.A_DIM
+
+    # History deques  (ax ay az | gx gy gz | mx my mz)
+    hist = [deque(maxlen=HISTORY) for _ in range(9)]
+
+    laser_on  = False
+    sample_count = 0
+    last_sample  = None
+
+    def safe_addstr(row, col, text, attr=0):
+        h, w = stdscr.getmaxyx()
+        if row >= h or col >= w:
+            return
+        try:
+            stdscr.addstr(row, col, text[: w - col], attr)
+        except curses.error:
+            pass
+
+    while True:
+        # ── Input ──────────────────────────────────────────────────────────
+        key = stdscr.getch()
+        if key in (27, ord("q"), ord("Q")):          # ESC or Q → quit
+            break
+        if key == ord(" "):
+            laser_on = not laser_on
+            reader.send("LASER_ON" if laser_on else "LASER_OFF")
+
+        # ── Pull latest IMU sample ─────────────────────────────────────────
+        raw = reader.latest()
+        err = reader.error()
+
+        if raw and raw != last_sample:
+            last_sample = raw
+            sample_count += 1
+            for i, v in enumerate(raw):
+                hist[i].append(v)
+
+        # ── Draw ───────────────────────────────────────────────────────────
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        bar_w = max(20, min(40, w - 30))
+
+        row = 0
+        title = "  Precision Farming Robot — Sensor Node Monitor  "
+        safe_addstr(row, max(0, (w - len(title)) // 2), title, HDR)
+        row += 1
+        safe_addstr(row, 0, "─" * w, HDR)
+        row += 1
+
+        # Laser status
+        if laser_on:
+            laser_str = "  LASER  [ ON  ]  (SPACE to toggle)"
+            safe_addstr(row, 0, laser_str, LASER_ON_ATTR)
+        else:
+            laser_str = "  LASER  [ OFF ]  (SPACE to toggle)"
+            safe_addstr(row, 0, laser_str, LASER_OFF_ATTR)
+        row += 1
+
+        # Connection status
+        if err:
+            safe_addstr(row, 0, f"  Serial ERROR: {err}", ERR)
+        else:
+            safe_addstr(row, 0, f"  Port: {SERIAL_PORT} @ {BAUD_RATE}  samples: {sample_count}", VAL)
+        row += 2
+
+        # ── Sections: Accel / Gyro / Mag ───────────────────────────────────
+        sections = [
+            ("Accelerometer", ["Ax", "Ay", "Az"], 0, ACC_SCALE, 2.0,   "g"),
+            ("Gyroscope",     ["Gx", "Gy", "Gz"], 3, GYR_SCALE, 500.0, "dps"),
+            ("Magnetometer",  ["Mx", "My", "Mz"], 6, MAG_SCALE, 500.0, "µT"),
+        ]
+
+        for title_s, labels, base, scale, full, unit in sections:
+            if row + 6 >= h:
+                break
+            safe_addstr(row, 2, f"── {title_s} ──", HDR)
+            row += 1
+
+            for i, lbl in enumerate(labels):
+                if row >= h:
                     break
+                idx  = base + i
+                raw_v = list(hist[idx])[-1] if hist[idx] else 0
+                phys  = raw_v / scale
+                spark = _sparkline(hist[idx], HISTORY)
+                bar   = _bar(phys, full, bar_w)
 
-            sleep(0.05)  # small delay to reduce CPU usage
+                col = 4
+                safe_addstr(row, col, f"{lbl}:", LBL)
+                col += 4
+                val_str = f"{phys:+8.3f} {unit}"
+                safe_addstr(row, col, val_str, VAL)
+                col += len(val_str) + 1
+                safe_addstr(row, col, bar, BAR)
+                col += bar_w + 1
+                safe_addstr(row, col, spark[:max(0, w - col - 1)], curses.color_pair(1))
+                row += 1
+
+            row += 1
+
+        # Footer
+        if row < h - 1:
+            safe_addstr(h - 1, 0, "  SPACE=laser toggle   Q/ESC=quit", LBL)
+
+        stdscr.refresh()
+        time.sleep(0.05)
+
+
+def main():
+    reader = SerialReader(SERIAL_PORT, BAUD_RATE)
+    reader.start()
+    try:
+        curses.wrapper(run_ui, reader)
     finally:
-        controller.stop_all()
-        controller.close()
+        reader.stop()
+
 
 if __name__ == "__main__":
-    curses.wrapper(main)
+    main()
