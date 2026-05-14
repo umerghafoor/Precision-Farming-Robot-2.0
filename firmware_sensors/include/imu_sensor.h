@@ -5,15 +5,13 @@
 #include <stdbool.h>
 
 struct ImuData {
-    int16_t ax, ay, az;   // Accelerometer (raw counts)
-    int16_t gx, gy, gz;   // Gyroscope     (raw counts)
-    int16_t mx, my, mz;   // Magnetometer  (raw counts)
+    int16_t ax, ay, az;   // Accelerometer (raw counts, mg x1000)
+    int16_t gx, gy, gz;   // Gyroscope     (raw counts, dps x10)
 };
 
 enum class ImuInitResult : uint8_t {
-    OK              = 0,
-    NOT_FOUND       = 1,   // mpu.setup() returned false — I2C no response
-    CALIB_FAILED    = 2,   // calibration timed out / produced bad data
+    OK        = 0,
+    NOT_FOUND = 1,
 };
 
 ImuInitResult initIMU();

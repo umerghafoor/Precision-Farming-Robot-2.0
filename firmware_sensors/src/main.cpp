@@ -58,9 +58,6 @@ static void buildTxPacket() {
     packInt16BE(spiTxBuf,  6, imuData.gx);
     packInt16BE(spiTxBuf,  8, imuData.gy);
     packInt16BE(spiTxBuf, 10, imuData.gz);
-    packInt16BE(spiTxBuf, 12, imuData.mx);
-    packInt16BE(spiTxBuf, 14, imuData.my);
-    packInt16BE(spiTxBuf, 16, imuData.mz);
 }
 
 // ── SPI ISR ───────────────────────────────────────────────────────────────────
@@ -114,14 +111,11 @@ void setup() {
     const ImuInitResult imuResult = initIMU();
     switch (imuResult) {
         case ImuInitResult::NOT_FOUND:
-            Serial.println(F("WARNING: MPU-9250 not found — continuing without IMU"));
-            break;
-        case ImuInitResult::CALIB_FAILED:
-            Serial.println(F("WARNING: MPU-9250 calibration failed — continuing without IMU"));
+            Serial.println(F("WARNING: MPU-6050 not found — continuing without IMU"));
             break;
         case ImuInitResult::OK:
             imuReady = true;
-            Serial.println(F("MPU-9250 ready."));
+            Serial.println(F("MPU-6050 ready."));
             break;
     }
 

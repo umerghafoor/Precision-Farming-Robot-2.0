@@ -18,7 +18,7 @@
 
 // SPI packet sizes (must match spi_controller_bridge on Raspberry Pi)
 #define SPI_RX_LEN  2    // Bytes received from master: [cmd, value]
-#define SPI_TX_LEN  18   // Bytes sent to master: 9 x int16_t (ax,ay,az,gx,gy,gz,mx,my,mz)
+#define SPI_TX_LEN  12   // Bytes sent to master: 6 x int16_t (ax,ay,az,gx,gy,gz)
 
 // Command byte values (sent by Raspberry Pi master)
 #define CMD_LASER_OFF  0x00

@@ -44,20 +44,21 @@ def find_port(node_id: str, baudrate: int = BAUD_RATE) -> str | None:
     for port in sorted(candidates):
         try:
             with serial.Serial(port, baudrate, timeout=1) as s:
-                # Toggle DTR to force a hardware reset — ensures the boot banner
-                # always prints even if the board is stuck in a halt loop.
-                s.dtr = False
-                time.sleep(0.1)
-                s.dtr = True
-                # Do NOT flush — the NODE_ID banner arrives during this wait
-                time.sleep(0.1)
-                deadline = time.monotonic() + 3.5
+                # Drain any buffered output, then send WHOAMI and read the reply.
+                # Flush first so the WHOAMI isn't lost in a flood of IMU lines.
+                deadline = time.monotonic() + 1.0
+                while time.monotonic() < deadline:
+                    s.readline()   # drain
+                s.reset_input_buffer()
+                s.write(b"WHOAMI\n")
+                s.flush()
+                deadline = time.monotonic() + 2.0
                 while time.monotonic() < deadline:
                     line = s.readline().decode("utf-8", errors="ignore").strip()
                     if line == node_id:
                         return port
                     if line.startswith("NODE_ID:"):
-                        break   # wrong node on this port
+                        break   # different node on this port
         except Exception:
             continue
     return None
@@ -83,16 +84,14 @@ SERIAL_PORT = resolve_port()
 # ── IMU scaling (must match firmware) ──────────────────────────────────────────
 # Firmware stores:  ax = accel_g * 1000  → divide by 1000 for g
 #                   gx = gyro_dps * 10   → divide by 10   for dps
-#                   mx = mag_uT * 10     → divide by 10   for µT
 ACC_SCALE = 1000.0
 GYR_SCALE = 10.0
-MAG_SCALE = 10.0
 
 # ── History length for sparkline bars ─────────────────────────────────────────
 HISTORY = 40
 
 _IMU_RE = re.compile(
-    r"A:(-?\d+),(-?\d+),(-?\d+)\s+G:(-?\d+),(-?\d+),(-?\d+)\s+M:(-?\d+),(-?\d+),(-?\d+)"
+    r"A:(-?\d+),(-?\d+),(-?\d+)\s+G:(-?\d+),(-?\d+),(-?\d+)"
 )
 
 
@@ -105,7 +104,7 @@ class SerialReader:
         self._ser  = None
         self._lock = threading.Lock()
         self._stop = threading.Event()
-        self._latest = None          # (ax,ay,az,gx,gy,gz,mx,my,mz) raw ints
+        self._latest = None          # (ax,ay,az,gx,gy,gz) raw ints
         self._error  = None          # last connect error string
         self._thread = threading.Thread(target=self._run, daemon=True)
 
@@ -217,8 +216,8 @@ def run_ui(stdscr, reader: SerialReader):
     LASER_ON_ATTR  = curses.color_pair(4) | curses.A_BOLD | curses.A_REVERSE
     LASER_OFF_ATTR = curses.color_pair(3) | curses.A_DIM
 
-    # History deques  (ax ay az | gx gy gz | mx my mz)
-    hist = [deque(maxlen=HISTORY) for _ in range(9)]
+    # History deques  (ax ay az | gx gy gz)
+    hist = [deque(maxlen=HISTORY) for _ in range(6)]
 
     laser_on  = False
     sample_count = 0
@@ -280,11 +279,10 @@ def run_ui(stdscr, reader: SerialReader):
             safe_addstr(row, 0, f"  Port: {SERIAL_PORT} @ {BAUD_RATE}  samples: {sample_count}", VAL)
         row += 2
 
-        # ── Sections: Accel / Gyro / Mag ───────────────────────────────────
+        # ── Sections: Accel / Gyro ─────────────────────────────────────────
         sections = [
             ("Accelerometer", ["Ax", "Ay", "Az"], 0, ACC_SCALE, 2.0,   "g"),
             ("Gyroscope",     ["Gx", "Gy", "Gz"], 3, GYR_SCALE, 500.0, "dps"),
-            ("Magnetometer",  ["Mx", "My", "Mz"], 6, MAG_SCALE, 500.0, "µT"),
         ]
 
         for title_s, labels, base, scale, full, unit in sections:
