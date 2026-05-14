@@ -41,9 +41,8 @@ def generate_launch_description():
             name='imu_node',
             output='screen',
             parameters=[
-                {'update_rate': 50.0},
-                {'i2c_bus': 1},
-                {'i2c_address': 0x68},
+                {'serial_port': 'auto'},   # auto-detects NODE_ID:sensor_node
+                {'publish_rate_hz': 50.0},
             ],
             emulate_tty=True,
         ),

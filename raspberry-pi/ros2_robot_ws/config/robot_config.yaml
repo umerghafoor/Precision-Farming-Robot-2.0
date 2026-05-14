@@ -16,30 +16,12 @@ motor_control:
   acceleration_limit: 0.5      # Max acceleration (m/s^2)
   deceleration_limit: -1.0     # Max deceleration (m/s^2)
 
-# IMU Sensor Parameters
+# IMU + Laser Sensor Node Parameters
+# Reads MPU-6050 accel/gyro and controls laser via Arduino Nano over USB Serial.
+# Laser is controlled via ROS2 service: ros2 service call /laser/set std_srvs/srv/SetBool "{data: true}"
 imu_sensor:
-  # I2C Configuration
-  i2c_bus: 1                   # I2C bus number (1 for Raspberry Pi)
-  i2c_address: 0x68            # MPU6050 default address (0x68 or 0x69)
-  
-  # Update rate
-  update_rate: 50.0            # Sensor update frequency (Hz)
-  
-  # Calibration offsets (set after calibration)
-  accel_offset_x: 0.0
-  accel_offset_y: 0.0
-  accel_offset_z: 0.0
-  gyro_offset_x: 0.0
-  gyro_offset_y: 0.0
-  gyro_offset_z: 0.0
-  
-  # Scale factors (for sensor calibration)
-  accel_scale_x: 1.0
-  accel_scale_y: 1.0
-  accel_scale_z: 1.0
-  gyro_scale_x: 1.0
-  gyro_scale_y: 1.0
-  gyro_scale_z: 1.0
+  serial_port: "auto"          # "auto" = detect by NODE_ID:sensor_node, or set e.g. "/dev/ttyUSB0"
+  publish_rate_hz: 50.0        # IMU publish frequency (Hz)
 
 # Camera Sensor Parameters
 camera_sensor:
