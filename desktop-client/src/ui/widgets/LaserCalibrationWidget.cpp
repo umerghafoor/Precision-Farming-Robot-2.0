@@ -269,7 +269,7 @@ bool LaserCalibrationWidget::initialize() {
     if (m_ros2Interface) {
         connect(m_ros2Interface, &ROS2Interface::imageReceived,
                 this, &LaserCalibrationWidget::onImageReceived);
-        m_ros2Interface->subscribeCameraTopic("/camera/raw");
+        m_ros2Interface->subscribeCameraTopic("/camera/color_jpeg");
         Logger::instance().info("LaserCalibrationWidget initialized");
     }
     return true;
