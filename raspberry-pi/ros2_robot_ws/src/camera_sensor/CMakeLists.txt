@@ -22,4 +22,10 @@ install(PROGRAMS
   RENAME webcam_node
 )
 
+install(PROGRAMS
+  camera_sensor/video_loop_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME video_loop_node
+)
+
 ament_package()
