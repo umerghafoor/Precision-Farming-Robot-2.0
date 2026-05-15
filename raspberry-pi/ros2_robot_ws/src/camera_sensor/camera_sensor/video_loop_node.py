@@ -90,7 +90,22 @@ class VideoLoopNode(Node):
 
 
 def main(args=None):
-    rclpy.init(args=args)
+    import sys
+
+    # Allow passing the video path as a bare positional argument:
+    #   ros2 run camera_sensor video_loop_node /path/to/video.mp4
+    # ROS2 passes its own flags after '--', so grab the first non-flag arg.
+    argv = args if args is not None else sys.argv[1:]
+    ros_args = argv
+
+    # If a plain file path was given positionally, inject it as a ROS2 param.
+    plain_paths = [a for a in argv if not a.startswith('-') and os.sep in a]
+    if plain_paths:
+        video_path = plain_paths[0]
+        ros_args = [a for a in argv if a != video_path]
+        ros_args += ['--ros-args', '-p', f'video_path:={video_path}']
+
+    rclpy.init(args=ros_args)
     node = None
     try:
         node = VideoLoopNode()
