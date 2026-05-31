@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Precision Farming Robot 2.0 — Documentation</title>
+<meta name="description" content="Full technical documentation for the Precision Farming Robot 2.0: firmware, ROS2 stack, computer vision, desktop client and mobile app." />
+
+<!-- Markdown + syntax highlighting (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-theme" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+
+<style>
+  :root {
+    --bg: #0e1116;
+    --bg-elev: #161b22;
+    --bg-sidebar: #0b0e13;
+    --border: #232a33;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --heading: #f0f6fc;
+    --accent: #3fb950;
+    --accent-2: #58a6ff;
+    --code-bg: #1b2129;
+    --table-stripe: #11161d;
+    --shadow: 0 8px 30px rgba(0,0,0,.5);
+    --sidebar-w: 300px;
+  }
+  html[data-theme="light"] {
+    --bg: #ffffff;
+    --bg-elev: #f6f8fa;
+    --bg-sidebar: #f6f8fa;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --text-dim: #636c76;
+    --heading: #0d1117;
+    --accent: #1a7f37;
+    --accent-2: #0969da;
+    --code-bg: #f6f8fa;
+    --table-stripe: #f6f8fa;
+    --shadow: 0 8px 30px rgba(140,149,159,.2);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ─────────────────────────────────────────── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ────────────────────────────────────────── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex: 0 0 var(--sidebar-w);
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .brand {
+    padding: 22px 22px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 16px; color: var(--heading);
+  }
+  .brand .logo .bot { font-size: 22px; }
+  .brand .tag { color: var(--text-dim); font-size: 12.5px; margin-top: 6px; }
+  .brand .ver {
+    display: inline-block; margin-top: 10px; font-size: 11px;
+    color: var(--accent); border: 1px solid var(--accent);
+    border-radius: 20px; padding: 1px 10px; opacity: .85;
+  }
+
+  .search-wrap { padding: 14px 16px 6px; }
+  #search {
+    width: 100%; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg-elev);
+    color: var(--text); font-size: 13.5px; outline: none;
+  }
+  #search:focus { border-color: var(--accent-2); }
+
+  nav { padding: 8px 10px 30px; flex: 1; }
+  nav .nav-group { margin-bottom: 4px; }
+  nav a.nav-link {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 12px; margin: 1px 0; border-radius: 7px;
+    color: var(--text-dim); text-decoration: none; font-size: 13.5px;
+    transition: background .12s, color .12s;
+    border-left: 3px solid transparent;
+  }
+  nav a.nav-link:hover { background: var(--bg-elev); color: var(--text); }
+  nav a.nav-link.active {
+    background: var(--bg-elev); color: var(--heading);
+    border-left-color: var(--accent); font-weight: 600;
+  }
+  nav a.nav-link .ico { font-size: 15px; width: 18px; text-align: center; }
+  nav .nav-num { color: var(--text-dim); font-size: 11px; min-width: 16px; }
+
+  /* sub-headings (in-page TOC) */
+  nav .subnav { margin: 0 0 6px 30px; display: none; }
+  nav a.nav-link.active + .subnav { display: block; }
+  nav .subnav a {
+    display: block; padding: 3px 10px; font-size: 12px;
+    color: var(--text-dim); text-decoration: none; border-radius: 5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  nav .subnav a:hover { color: var(--accent-2); }
+
+  /* ── Main ───────────────────────────────────────────── */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 26px; background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--border);
+  }
+  .topbar .crumbs { color: var(--text-dim); font-size: 13px; flex: 1; }
+  .topbar .crumbs b { color: var(--text); font-weight: 600; }
+  .icon-btn {
+    cursor: pointer; background: var(--bg-elev); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 14px;
+    line-height: 1;
+  }
+  .icon-btn:hover { border-color: var(--accent-2); }
+  #menu-btn { display: none; }
+
+  .content {
+    max-width: 920px; width: 100%; margin: 0 auto;
+    padding: 38px 32px 90px; flex: 1;
+  }
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    z-index: 50; transition: width .1s;
+  }
+
+  /* ── Markdown typography ────────────────────────────── */
+  .md h1, .md h2, .md h3, .md h4 { color: var(--heading); line-height: 1.25; font-weight: 700; scroll-margin-top: 70px; }
+  .md h1 { font-size: 2em; margin: 0 0 .5em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+  .md h2 { font-size: 1.5em; margin: 1.8em 0 .6em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+  .md h3 { font-size: 1.2em; margin: 1.5em 0 .5em; }
+  .md h4 { font-size: 1.05em; margin: 1.3em 0 .4em; }
+  .md p { margin: .8em 0; }
+  .md a { color: var(--accent-2); text-decoration: none; }
+  .md a:hover { text-decoration: underline; }
+  .md ul, .md ol { padding-left: 1.6em; margin: .7em 0; }
+  .md li { margin: .3em 0; }
+  .md blockquote {
+    margin: 1em 0; padding: .4em 1.1em; color: var(--text-dim);
+    border-left: 4px solid var(--accent); background: var(--bg-elev);
+    border-radius: 0 8px 8px 0;
+  }
+  .md blockquote p { margin: .35em 0; }
+  .md hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
+
+  .md code {
+    font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg); padding: .15em .4em; border-radius: 5px;
+    font-size: .88em; border: 1px solid var(--border);
+  }
+  .md pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px; overflow-x: auto;
+    margin: 1.1em 0; position: relative;
+  }
+  .md pre code { background: none; border: none; padding: 0; font-size: .85em; line-height: 1.5; }
+  .copy-btn {
+    position: absolute; top: 8px; right: 8px; opacity: 0;
+    background: var(--bg-elev); border: 1px solid var(--border);
+    color: var(--text-dim); border-radius: 6px; padding: 3px 9px;
+    font-size: 11px; cursor: pointer; transition: opacity .15s;
+  }
+  .md pre:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .md table {
+    border-collapse: collapse; width: 100%; margin: 1.2em 0;
+    font-size: .9em; display: block; overflow-x: auto;
+  }
+  .md th, .md td { border: 1px solid var(--border); padding: 8px 13px; text-align: left; }
+  .md th { background: var(--bg-elev); color: var(--heading); font-weight: 600; }
+  .md tr:nth-child(even) td { background: var(--table-stripe); }
+
+  .md img { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+
+  /* page footer nav */
+  .page-nav {
+    display: flex; justify-content: space-between; gap: 16px;
+    margin-top: 50px; padding-top: 24px; border-top: 1px solid var(--border);
+  }
+  .page-nav a {
+    flex: 1; text-decoration: none; color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px;
+    background: var(--bg-elev); transition: border-color .15s, transform .15s;
+  }
+  .page-nav a:hover { border-color: var(--accent-2); transform: translateY(-2px); }
+  .page-nav a.next { text-align: right; }
+  .page-nav .dir { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; }
+  .page-nav .ttl { font-size: 15px; font-weight: 600; color: var(--heading); margin-top: 3px; }
+  .page-nav .ph { visibility: hidden; }
+
+  .loading { color: var(--text-dim); padding: 40px 0; text-align: center; }
+  .spinner {
+    width: 26px; height: 26px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 0 auto 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .err {
+    border: 1px solid #f8514944; background: #f8514915;
+    border-radius: 10px; padding: 18px 22px; color: var(--text);
+  }
+  .err code { background: var(--code-bg); }
+
+  .scrim {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 25;
+  }
+
+  /* ── Mobile ─────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .sidebar {
+      position: fixed; left: 0; top: 0; z-index: 30;
+      transform: translateX(-100%); transition: transform .25s; box-shadow: var(--shadow);
+    }
+    .sidebar.open { transform: translateX(0); }
+    #menu-btn { display: inline-block; }
+    .scrim.show { display: block; }
+    .content { padding: 26px 18px 70px; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="scrim" id="scrim"></div>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo"><span class="bot">🤖</span> Precision Farming Robot 2.0</div>
+      <div class="tag">Autonomous precision-agriculture robot — full technical docs</div>
+      <span class="ver">v2.0 · docs</span>
+    </div>
+    <div class="search-wrap">
+      <input id="search" type="text" placeholder="Search docs…  (press /)" autocomplete="off" />
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="menu-btn" title="Menu">☰</button>
+      <div class="crumbs" id="crumbs">Documentation</div>
+      <button class="icon-btn" id="theme-btn" title="Toggle theme">🌙</button>
+    </div>
+    <main class="content">
+      <article class="md" id="doc">
+        <div class="loading"><div class="spinner"></div>Loading documentation…</div>
+      </article>
+      <div class="page-nav" id="page-nav"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+/* ────────────────────────────────────────────────────────────────────────
+   Page registry — order defines the sidebar + prev/next navigation.
+   ──────────────────────────────────────────────────────────────────────── */
+const PAGES = [
+  { id: "overview",        file: "content/01-overview.md",        title: "Overview",                 icon: "🌐" },
+  { id: "hardware",        file: "content/02-hardware.md",        title: "Hardware & Wiring",        icon: "🔌" },
+  { id: "firmware-motor",  file: "content/03-firmware-motor.md",  title: "Firmware — Motor",         icon: "⚙️" },
+  { id: "firmware-sensors",file: "content/04-firmware-sensors.md",title: "Firmware — Sensors",       icon: "📟" },
+  { id: "ros2-stack",      file: "content/05-ros2-stack.md",      title: "ROS2 Control Stack",       icon: "🧩" },
+  { id: "computer-vision", file: "content/06-computer-vision.md", title: "Computer Vision",          icon: "👁️" },
+  { id: "desktop-client",  file: "content/07-desktop-client.md",  title: "Desktop Client",           icon: "🖥️" },
+  { id: "mqtt-mobile",     file: "content/08-mqtt-mobile.md",     title: "MQTT & Mobile App",        icon: "📡" },
+  { id: "topics-api",      file: "content/09-topics-api.md",      title: "Topic / API Reference",    icon: "📚" },
+  { id: "getting-started", file: "content/10-getting-started.md", title: "Getting Started & Ops",    icon: "🚀" },
+];
+
+const cache = {};          // id -> { html, headings:[{id,text,level}] }
+const docEl   = document.getElementById("doc");
+const navEl   = document.getElementById("nav");
+const crumbs  = document.getElementById("crumbs");
+const pageNav = document.getElementById("page-nav");
+
+/* Configure marked: add ids to headings + tag code for hljs */
+function slug(s) {
+  return s.toLowerCase().trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+const renderer = new marked.Renderer();
+const headingBuffer = [];
+renderer.heading = function (text, level, raw) {
+  // marked v12 may pass an object; normalise
+  let t = text, l = level;
+  if (typeof text === "object" && text !== null) { t = text.text; l = text.depth; raw = text.raw ?? text.text; }
+  const plain = String(raw ?? t).replace(/<[^>]+>/g, "");
+  const id = slug(plain);
+  headingBuffer.push({ id, text: plain, level: l });
+  return `<h${l} id="${id}">${typeof t === "string" ? t : marked.parseInline(plain)}</h${l}>`;
+};
+marked.setOptions({ renderer, gfm: true, breaks: false });
+
+/* ── Build sidebar ── */
+function buildNav() {
+  navEl.innerHTML = "";
+  PAGES.forEach((p, i) => {
+    const group = document.createElement("div");
+    group.className = "nav-group";
+    const a = document.createElement("a");
+    a.className = "nav-link";
+    a.href = "#" + p.id;
+    a.dataset.id = p.id;
+    a.innerHTML = `<span class="nav-num">${String(i + 1).padStart(2, "0")}</span>
+                   <span class="ico">${p.icon}</span><span>${p.title}</span>`;
+    group.appendChild(a);
+    const sub = document.createElement("div");
+    sub.className = "subnav";
+    sub.id = "subnav-" + p.id;
+    group.appendChild(sub);
+    navEl.appendChild(group);
+  });
+}
+
+/* ── Fetch + render a page ── */
+async function loadPage(id, { push = true, anchor = null } = {}) {
+  const page = PAGES.find((p) => p.id === id) || PAGES[0];
+
+  if (!cache[page.id]) {
+    docEl.innerHTML = `<div class="loading"><div class="spinner"></div>Loading…</div>`;
+    try {
+      const res = await fetch(page.file, { cache: "no-cache" });
+      if (!res.ok) throw new Error(res.status + " " + res.statusText);
+      const text = await res.text();
+      headingBuffer.length = 0;
+      const html = marked.parse(text);
+      cache[page.id] = { html, headings: headingBuffer.slice() };
+    } catch (e) {
+      docEl.innerHTML = renderError(page, e);
+      return;
+    }
+  }
+
+  docEl.innerHTML = cache[page.id].html;
+  enhance();
+  buildSubnav(page.id, cache[page.id].headings);
+  setActive(page.id);
+  buildPageNav(page.id);
+  crumbs.innerHTML = `Documentation <span style="opacity:.5">/</span> <b>${page.title}</b>`;
+  document.title = page.title + " — Precision Farming Robot 2.0";
+
+  if (push) history.replaceState(null, "", "#" + page.id + (anchor ? "/" + anchor : ""));
+
+  // scroll
+  if (anchor) {
+    const el = document.getElementById(anchor);
+    if (el) { el.scrollIntoView(); return; }
+  }
+  window.scrollTo({ top: 0 });
+}
+
+function renderError(page, e) {
+  return `<div class="err">
+    <h2 style="margin-top:0">Couldn't load this page</h2>
+    <p>Failed to fetch <code>${page.file}</code> — <code>${e.message}</code>.</p>
+    <p>This documentation loads Markdown over <code>fetch()</code>, which browsers block on the
+    <code>file://</code> protocol. Serve the <code>docs/</code> folder over HTTP instead:</p>
+    <pre><code>cd docs &amp;&amp; python3 -m http.server 8000
+# then open http://localhost:8000/</code></pre>
+  </div>`;
+}
+
+/* ── Post-render enhancements: highlight + copy buttons + relative links ── */
+function enhance() {
+  docEl.querySelectorAll("pre code").forEach((block) => {
+    try { hljs.highlightElement(block); } catch (_) {}
+    const pre = block.parentElement;
+    if (pre.querySelector(".copy-btn")) return;
+    const btn = document.createElement("button");
+    btn.className = "copy-btn";
+    btn.textContent = "Copy";
+    btn.addEventListener("click", () => {
+      navigator.clipboard.writeText(block.innerText).then(() => {
+        btn.textContent = "Copied!";
+        setTimeout(() => (btn.textContent = "Copy"), 1400);
+      });
+    });
+    pre.appendChild(btn);
+  });
+
+  // intercept in-page anchor links so the SPA handles them
+  docEl.querySelectorAll('a[href^="#"]').forEach((a) => {
+    a.addEventListener("click", (ev) => {
+      const href = a.getAttribute("href").slice(1);
+      if (!href) return;            // "#" placeholder cross-page link
+      ev.preventDefault();
+      const target = document.getElementById(href);
+      if (target) target.scrollIntoView();
+    });
+  });
+}
+
+/* ── In-page table of contents (h2/h3) ── */
+function buildSubnav(id, headings) {
+  PAGES.forEach((p) => {
+    const el = document.getElementById("subnav-" + p.id);
+    if (el) el.innerHTML = "";
+  });
+  const sub = document.getElementById("subnav-" + id);
+  if (!sub) return;
+  headings.filter((h) => h.level === 2).forEach((h) => {
+    const a = document.createElement("a");
+    a.href = "#" + id + "/" + h.id;
+    a.textContent = h.text;
+    a.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const t = document.getElementById(h.id);
+      if (t) t.scrollIntoView();
+      history.replaceState(null, "", "#" + id + "/" + h.id);
+    });
+    sub.appendChild(a);
+  });
+}
+
+function setActive(id) {
+  navEl.querySelectorAll("a.nav-link").forEach((a) =>
+    a.classList.toggle("active", a.dataset.id === id)
+  );
+}
+
+/* ── Prev / next footer ── */
+function buildPageNav(id) {
+  const i = PAGES.findIndex((p) => p.id === id);
+  const prev = PAGES[i - 1], next = PAGES[i + 1];
+  pageNav.innerHTML = "";
+  const mk = (p, dir, cls) => {
+    if (!p) { const ph = document.createElement("span"); ph.className = "ph"; pageNav.appendChild(ph); return; }
+    const a = document.createElement("a");
+    a.className = cls; a.href = "#" + p.id;
+    a.innerHTML = `<div class="dir">${dir}</div><div class="ttl">${p.icon} ${p.title}</div>`;
+    pageNav.appendChild(a);
+  };
+  mk(prev, "← Previous", "prev");
+  mk(next, "Next →", "next");
+}
+
+/* ── Search (filters sidebar + matches page titles/headings) ── */
+const searchEl = document.getElementById("search");
+searchEl.addEventListener("input", () => {
+  const q = searchEl.value.trim().toLowerCase();
+  navEl.querySelectorAll(".nav-group").forEach((g) => {
+    const link = g.querySelector(".nav-link");
+    const id = link.dataset.id;
+    const page = PAGES.find((p) => p.id === id);
+    const hay = (page.title + " " + (cache[id] ? cache[id].headings.map((h) => h.text).join(" ") : "")).toLowerCase();
+    g.style.display = !q || hay.includes(q) ? "" : "none";
+  });
+});
+
+/* ── Routing ── */
+function routeFromHash() {
+  const raw = location.hash.replace(/^#/, "");
+  const [id, anchor] = raw.split("/");
+  const page = PAGES.find((p) => p.id === id);
+  loadPage(page ? id : PAGES[0].id, { push: false, anchor: anchor || null });
+}
+window.addEventListener("hashchange", routeFromHash);
+
+navEl.addEventListener("click", (ev) => {
+  const a = ev.target.closest("a.nav-link");
+  if (!a) return;
+  ev.preventDefault();
+  loadPage(a.dataset.id);
+  closeSidebar();
+});
+
+/* ── Scroll progress bar ── */
+const progress = document.getElementById("progress");
+window.addEventListener("scroll", () => {
+  const h = document.documentElement;
+  const max = h.scrollHeight - h.clientHeight;
+  progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + "%";
+});
+
+/* ── Theme toggle ── */
+const themeBtn = document.getElementById("theme-btn");
+const hljsTheme = document.getElementById("hljs-theme");
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  themeBtn.textContent = t === "light" ? "☀️" : "🌙";
+  hljsTheme.href = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/" +
+    (t === "light" ? "github" : "github-dark") + ".min.css";
+  try { localStorage.setItem("pfr-theme", t); } catch (_) {}
+}
+themeBtn.addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+  applyTheme(cur);
+});
+(function initTheme() {
+  let t = "dark";
+  try { t = localStorage.getItem("pfr-theme") || "dark"; } catch (_) {}
+  applyTheme(t);
+})();
+
+/* ── Mobile sidebar ── */
+const sidebar = document.getElementById("sidebar");
+const scrim = document.getElementById("scrim");
+function openSidebar() { sidebar.classList.add("open"); scrim.classList.add("show"); }
+function closeSidebar() { sidebar.classList.remove("open"); scrim.classList.remove("show"); }
+document.getElementById("menu-btn").addEventListener("click", openSidebar);
+scrim.addEventListener("click", closeSidebar);
+
+/* ── Keyboard: "/" focuses search ── */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && document.activeElement !== searchEl) {
+    e.preventDefault(); searchEl.focus();
+  }
+  if (e.key === "Escape") { searchEl.blur(); closeSidebar(); }
+});
+
+/* ── Boot ── */
+buildNav();
+routeFromHash();
+</script>
+</body>
+</html>
