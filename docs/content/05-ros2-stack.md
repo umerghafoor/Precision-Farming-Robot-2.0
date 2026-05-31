@@ -17,17 +17,15 @@ The committed launch file (`launch/robot.launch.py`, package `robot`) brings up 
 
 `yolo_detection_node`, `encoder_node`, and `robot_controller` are **not** in this launch file — they're started separately when needed.
 
-```
-  webcam_node ──/camera/color_jpeg──► yolo_detection_node ──/camera/detection──┐
-       │                                      │                                │
-       └──/camera/raw (gray4)                 └──/detections/results──┐        │
-                                                                      ▼        ▼
-  /cmd_vel ──► spi_controller_bridge ──serial──► Arduino Uno     mqtt_bridge_node ──► MQTT
-                                                                      ▲   ▲   ▲
-  Arduino Nano ──serial──► imu_node ──/imu/data──────────────────────┘   │   │
-                              │                                /odom──────┘   │
-                              └──/laser/state, /laser/set      /robot_status──┘
-```
+<!-- DIAGRAM:ROS2-GRAPH:BEGIN -->
+<div class="diagram">
+<svg viewBox="0 0 870 430" role="img" aria-label="ROS2 node dataflow graph">
+<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--text-dim)"/></marker><marker id="ar-a" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--accent)"/></marker><marker id="ar-b" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--accent-2)"/></marker><marker id="ar-w" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#d29922"/></marker></defs>
+<rect class="node-accent" x="30" y="30" width="160" height="54" rx="9"/><text class="t" x="110" y="53" text-anchor="middle">webcam_node</text><text class="t-dim" x="110" y="69" text-anchor="middle">camera_sensor</text><rect class="node-blue" x="330" y="30" width="180" height="54" rx="9"/><text class="t" x="420" y="53" text-anchor="middle">yolo_detection_node</text><text class="t-dim" x="420" y="69" text-anchor="middle">yolo_detection</text><rect class="node-blue" x="660" y="130" width="180" height="54" rx="9"/><text class="t" x="750" y="153" text-anchor="middle">mqtt_bridge_node</text><text class="t-dim" x="750" y="169" text-anchor="middle">mqtt_bridge</text><rect class="node-warn" x="700" y="30" width="120" height="54" rx="9"/><text class="t" x="760" y="61" text-anchor="middle">MQTT broker</text><rect class="node-accent" x="30" y="190" width="190" height="54" rx="9"/><text class="t" x="125" y="213" text-anchor="middle">spi_controller_bridge</text><text class="t-dim" x="125" y="229" text-anchor="middle">motor_control</text><rect class="node" x="360" y="190" width="150" height="54" rx="9"/><text class="t" x="435" y="221" text-anchor="middle">Arduino Uno</text><rect class="node-accent" x="30" y="330" width="160" height="54" rx="9"/><text class="t" x="110" y="353" text-anchor="middle">imu_node</text><text class="t-dim" x="110" y="369" text-anchor="middle">imu_sensor</text><rect class="node" x="360" y="330" width="150" height="54" rx="9"/><text class="t" x="435" y="361" text-anchor="middle">Arduino Nano</text><path class="edge-accent" d="M190,50 L326,50" marker-end="url(#ar-a)"/><rect class="elabel-bg" x="194" y="31" width="116" height="14"/><text class="elabel" x="196" y="42">/camera/color_jpeg</text><path class="edge" d="M110,84 L110,130 L320,130" marker-end="url(#ar)"/><rect class="elabel-bg" x="128" y="113" width="122" height="14"/><text class="elabel" x="130" y="124">/camera/raw (gray4)</text><path class="edge-blue" d="M510,50 L600,50 L600,145 L656,145" marker-end="url(#ar-b)"/><rect class="elabel-bg" x="518" y="31" width="110" height="14"/><text class="elabel" x="520" y="42">/camera/detection</text><path class="edge-blue" d="M510,64 L580,64 L580,165 L656,165" marker-end="url(#ar-b)"/><rect class="elabel-bg" x="518" y="89" width="122" height="14"/><text class="elabel" x="520" y="100">/detections/results</text><text class="t-dim" x="30" y="180">/cmd_vel ►</text><path class="edge-accent" d="M220,216 L356,216" marker-end="url(#ar-a)"/><rect class="elabel-bg" x="242" y="197" width="86" height="14"/><text class="elabel" x="244" y="208">serial 6-byte</text><path class="edge" d="M360,356 L194,356" marker-end="url(#ar)"/><rect class="elabel-bg" x="226" y="337" width="80" height="14"/><text class="elabel" x="228" y="348">serial A:/G:</text><path class="edge" d="M190,340 L620,340 L620,188" marker-end="url(#ar)"/><rect class="elabel-bg" x="298" y="321" width="62" height="14"/><text class="elabel" x="300" y="332">/imu/data</text><path class="edge" d="M110,384 L110,410 L435,410 L435,386" marker-end="url(#ar)"/><rect class="elabel-bg" x="138" y="395" width="146" height="14"/><text class="elabel" x="140" y="406">/laser/set · /laser/cmd</text><path class="edge-blue" d="M750,130 L750,86" marker-end="url(#ar-b)"/><rect class="elabel-bg" x="756" y="101" width="32" height="14"/><text class="elabel" x="758" y="112">MQTT</text>
+</svg>
+<div class="d-cap">Production node graph from robot.launch.py plus the YOLO node. Green = motor/camera path, blue = vision/MQTT path.</div>
+</div>
+<!-- DIAGRAM:ROS2-GRAPH:END -->
 
 ---
 

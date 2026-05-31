@@ -14,13 +14,15 @@ A **Qt6 C++17** desktop application for live robot monitoring, command control, 
 
 ## 1. Startup flow
 
-```
-src/main.cpp
-   └─ Application
-        ├─ ROS2Interface     (pub/sub, thread boundary)
-        ├─ DigitalTwin       (modes / state / simulation)
-        └─ MainWindow + WidgetManager   (menus, docks, widgets)
-```
+<!-- DIAGRAM:DESKTOP-FLOW:BEGIN -->
+<div class="diagram">
+<svg viewBox="0 0 820 300" role="img" aria-label="Desktop client startup and dependency-injection flow">
+<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--text-dim)"/></marker><marker id="ar-a" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--accent)"/></marker><marker id="ar-b" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--accent-2)"/></marker><marker id="ar-w" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#d29922"/></marker></defs>
+<rect class="node" x="300" y="20" width="220" height="48" rx="9"/><text class="t" x="410" y="48" text-anchor="middle">src/main.cpp</text><rect class="node-accent" x="300" y="110" width="220" height="48" rx="9"/><text class="t" x="410" y="130" text-anchor="middle">Application</text><text class="t-dim" x="410" y="146" text-anchor="middle">facade · wiring</text><path class="edge" d="M410,68 L410,106" marker-end="url(#ar)"/><rect class="node-blue" x="40" y="220" width="220" height="56" rx="9"/><text class="t" x="150" y="244" text-anchor="middle">ROS2Interface</text><text class="t-dim" x="150" y="260" text-anchor="middle">pub/sub · thread boundary</text><rect class="node" x="300" y="220" width="220" height="56" rx="9"/><text class="t" x="410" y="244" text-anchor="middle">DigitalTwin</text><text class="t-dim" x="410" y="260" text-anchor="middle">modes · state · sim</text><rect class="node-accent" x="560" y="220" width="220" height="56" rx="9"/><text class="t" x="670" y="244" text-anchor="middle">MainWindow + WidgetManager</text><text class="t-dim" x="670" y="260" text-anchor="middle">menus · docks · widgets</text><path class="edge" d="M410,158 L150,158 L150,216" marker-end="url(#ar)"/><path class="edge" d="M410,158 L410,216" marker-end="url(#ar)"/><path class="edge" d="M410,158 L670,158 L670,216" marker-end="url(#ar)"/>
+</svg>
+<div class="d-cap">Startup order: main.cpp boots Application, which initialises ROS2Interface → DigitalTwin → MainWindow + WidgetManager in dependency order.</div>
+</div>
+<!-- DIAGRAM:DESKTOP-FLOW:END -->
 
 `Application` is the facade that orchestrates lifecycle and dependency injection in this order. `MainWindow::addWidgetToDock()` is where each new widget receives `setROS2Interface()`, `setDigitalTwin()`, then `initialize()`.
 

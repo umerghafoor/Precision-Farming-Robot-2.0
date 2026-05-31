@@ -197,6 +197,33 @@
 
   .md img { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); }
 
+  /* ── SVG diagrams (theme-aware) ─────────────────────── */
+  .diagram {
+    margin: 1.4em 0; padding: 18px; border: 1px solid var(--border);
+    border-radius: 12px; background: var(--bg-elev); overflow-x: auto;
+  }
+  .diagram svg { display: block; width: 100%; height: auto; max-width: 920px; margin: 0 auto; }
+  .diagram .d-cap {
+    text-align: center; color: var(--text-dim); font-size: 12.5px; margin-top: 10px;
+  }
+  /* node boxes */
+  .diagram .node { fill: var(--code-bg); stroke: var(--border); stroke-width: 1.5; }
+  .diagram .node-accent { fill: color-mix(in srgb, var(--accent) 16%, var(--code-bg)); stroke: var(--accent); stroke-width: 1.5; }
+  .diagram .node-blue   { fill: color-mix(in srgb, var(--accent-2) 16%, var(--code-bg)); stroke: var(--accent-2); stroke-width: 1.5; }
+  .diagram .node-warn   { fill: color-mix(in srgb, #d29922 18%, var(--code-bg)); stroke: #d29922; stroke-width: 1.5; }
+  .diagram .group-box { fill: none; stroke: var(--border); stroke-width: 1.25; stroke-dasharray: 5 4; }
+  /* text */
+  .diagram .t      { fill: var(--heading); font: 600 13px -apple-system,"Segoe UI",sans-serif; }
+  .diagram .t-sm   { fill: var(--text); font: 11px ui-monospace,"SF Mono",Menlo,monospace; }
+  .diagram .t-dim  { fill: var(--text-dim); font: 11px ui-monospace,"SF Mono",Menlo,monospace; }
+  .diagram .t-grp  { fill: var(--text-dim); font: 600 11px -apple-system,sans-serif; letter-spacing:.05em; text-transform:uppercase; }
+  /* edges */
+  .diagram .edge   { stroke: var(--text-dim); stroke-width: 1.6; fill: none; }
+  .diagram .edge-accent { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+  .diagram .edge-blue   { stroke: var(--accent-2); stroke-width: 1.8; fill: none; }
+  .diagram .elabel { fill: var(--text-dim); font: 10.5px ui-monospace,Menlo,monospace; }
+  .diagram .elabel-bg { fill: var(--bg-elev); }
+
   /* page footer nav */
   .page-nav {
     display: flex; justify-content: space-between; gap: 16px;
